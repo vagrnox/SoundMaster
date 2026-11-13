@@ -24,12 +24,24 @@ public partial class TimelineViewModel : ViewModelBase
     public partial double OffsetSeconds { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ClockText), nameof(BarsText))]
+    [NotifyPropertyChangedFor(nameof(ClockText), nameof(BarsText), nameof(PositionShortText))]
     public partial double PositionSeconds { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ScrollMaximum))]
+    [NotifyPropertyChangedFor(nameof(ScrollMaximum), nameof(DurationText), nameof(DurationShortText))]
     public partial double DurationSeconds { get; set; }
+
+    public string DurationShortText => FormatMmSs(DurationSeconds);
+
+    /// <summary>Tổng thời lượng dạng mm:ss.</summary>
+    public string DurationText
+    {
+        get
+        {
+            var t = TimeSpan.FromSeconds(Math.Max(0, Math.Round(DurationSeconds)));
+            return $"{(int)t.TotalMinutes:00}:{t.Seconds:00}";
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BpmText), nameof(BarsText))]
@@ -42,6 +54,13 @@ public partial class TimelineViewModel : ViewModelBase
     public double ViewportSeconds => PixelsPerSecond > 0 ? ViewportWidth / PixelsPerSecond : 0;
     public double ScrollMaximum => Math.Max(0, DurationSeconds - ViewportSeconds + 2);
     public string ClockText => TimelineMath.Clock(PositionSeconds);
+    public string PositionShortText => FormatMmSs(PositionSeconds);
+
+    private static string FormatMmSs(double seconds)
+    {
+        var t = TimeSpan.FromSeconds(Math.Max(0, Math.Floor(seconds)));
+        return $"{(int)t.TotalMinutes:00}:{t.Seconds:00}";
+    }
     public string BarsText => TimelineMath.Bars(PositionSeconds, Bpm, BeatsPerBar);
 
     /// <summary>Ô nhập BPM: chỉ nhận giá trị 30–300.</summary>

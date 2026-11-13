@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 
 namespace SoundMaster.App.Controls;
 
@@ -15,9 +16,8 @@ public class PlayheadOverlay : Control
 
     public static readonly StyledProperty<double> PixelsPerSecondProperty =
         AvaloniaProperty.Register<PlayheadOverlay, double>(nameof(PixelsPerSecond), 20);
-
-    private static readonly IBrush LineBrush = new SolidColorBrush(Color.Parse("#FFFFFF"), 0.9);
-    private static readonly Pen LinePen = new(LineBrush, 1.5);
+    private static readonly ImmutableSolidColorBrush LineBrush = new ImmutableSolidColorBrush(Color.Parse("#F1AB29"));
+    private static readonly IPen LinePen = new ImmutablePen(LineBrush, 1.5);
 
     static PlayheadOverlay()
     {
@@ -35,6 +35,15 @@ public class PlayheadOverlay : Control
         if (x < 0 || x > Bounds.Width) return;
 
         context.DrawLine(LinePen, new Point(x, 0), new Point(x, Bounds.Height));
-        context.DrawEllipse(LineBrush, null, new Point(x, 9), 5, 5);
+        // Đầu playhead: tam giác đỉnh chỉ xuống track.
+        var tri = new StreamGeometry();
+        using (var g = tri.Open())
+        {
+            g.BeginFigure(new Point(x - 6, 0), true);
+            g.LineTo(new Point(x + 6, 0));
+            g.LineTo(new Point(x, 11));
+            g.EndFigure(true);
+        }
+        context.DrawGeometry(LineBrush, null, tri);
     }
 }

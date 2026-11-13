@@ -39,7 +39,7 @@ public partial class ColorSwatch : ObservableObject
 
 public partial class TrackViewModel : ViewModelBase
 {
-    public const double RowHeight = 104;
+    public const double RowHeight = 68;
 
     public TrackViewModel(ChannelStrip strip, TimelineViewModel timeline, int index, string colorHex)
     {
@@ -91,7 +91,7 @@ public partial class TrackViewModel : ViewModelBase
 
     /// <summary>Khóa track: không cho sửa tên, màu, volume, pan, mute, solo, arm.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEditable))]
+    [NotifyPropertyChangedFor(nameof(IsEditable), nameof(ColorBrush), nameof(ColorValue), nameof(LaneBackground))]
     public partial bool IsLocked { get; set; }
 
     [ObservableProperty]
@@ -105,8 +105,14 @@ public partial class TrackViewModel : ViewModelBase
     public partial double MeterRightDb { get; set; } = -90;
 
     public bool IsEditable => !IsLocked;
-    public IBrush ColorBrush => new SolidColorBrush(Color.Parse(ColorHex));
-    public Color ColorValue => Color.Parse(ColorHex);
+    /// <summary>Màu khi bị khóa: xám (mọi thanh của track chuyển xám).</summary>
+    public static readonly Color LockedColor = Color.Parse("#6B6B6B");
+
+    public IBrush ColorBrush => new SolidColorBrush(ColorValue);
+    /// <summary>Nền lane: xám như sidebar khi track bị khóa, trong suốt khi không.</summary>
+    public IBrush LaneBackground => IsLocked ? new SolidColorBrush(Color.Parse("#1C1C1C")) : Brushes.Transparent;
+
+    public Color ColorValue => IsLocked ? LockedColor : Color.Parse(ColorHex);
     public string GainText => GainDb <= ChannelStrip.MinGainDb ? "Volume: -∞ dB" : $"Volume: {GainDb:0.0} dB";
 
     partial void OnNameChanged(string value) => Strip.Name = value;

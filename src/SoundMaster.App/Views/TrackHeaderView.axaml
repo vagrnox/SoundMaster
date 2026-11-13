@@ -4,16 +4,28 @@
              xmlns:ctl="using:SoundMaster.App.Controls"
              x:Class="SoundMaster.App.Views.TrackHeaderView"
              x:DataType="vm:TrackViewModel">
-    <Border Height="104" Background="#141414" BorderBrush="#000000" BorderThickness="0,0,0,2">
+    <Border Height="68" Background="#141414" BorderBrush="#000000" BorderThickness="0,0,0,3">
+        <Border.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="Chuyển lên" Click="OnMoveUp" IsEnabled="{Binding IsEditable}" />
+                <MenuItem Header="Chuyển xuống" Click="OnMoveDown" IsEnabled="{Binding IsEditable}" />
+                <Separator />
+                <MenuItem Header="Xóa track" Click="OnRemove" IsEnabled="{Binding IsEditable}" />
+            </ContextMenu>
+        </Border.ContextMenu>
         <Grid ColumnDefinitions="5,*">
             <!-- Vạch màu của track -->
             <Border Grid.Column="0" Background="{Binding ColorBrush}" />
 
-            <Grid Grid.Column="1" Margin="8,6,10,6" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
+            <Grid Grid.Column="1" Margin="8,4,10,4" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
                 <!-- Hàng 1: số thứ tự, tên, đổi màu, mute, solo, arm, khóa -->
                 <Grid Grid.Row="0" ColumnDefinitions="22,*,Auto,Auto,Auto,Auto,Auto">
-                    <TextBlock Grid.Column="0" Text="{Binding Index}" FontSize="11" Opacity="0.55"
-                               VerticalAlignment="Center" />
+                    <!-- Số thứ tự cũng là tay nắm: kéo lên/xuống để đổi thứ tự track -->
+                    <Border Grid.Column="0" Classes="grip" Background="Transparent" Cursor="SizeAll"
+                            ToolTip.Tip="Kéo để đổi thứ tự track">
+                        <TextBlock Text="{Binding Index}" FontSize="11" Opacity="0.55"
+                                   VerticalAlignment="Center" />
+                    </Border>
                     <TextBox Grid.Column="1" Classes="flat" Text="{Binding Name}" FontSize="13"
                              Padding="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center"
                              Height="26" MinHeight="26"
@@ -75,11 +87,10 @@
                                    AccentColor="{Binding ColorValue}"
                                    IsEnabled="{Binding IsEditable}"
                                    ToolTip.Tip="{Binding GainText}" />
-                    <Slider Grid.Column="1" x:Name="PanSlider" Minimum="-1" Maximum="1" Width="64"
-                            Value="{Binding Pan}" Margin="10,0,0,0" VerticalAlignment="Center"
-                            IsEnabled="{Binding IsEditable}"
-                            DoubleTapped="OnPanDoubleTapped"
-                            ToolTip.Tip="Pan (double-click để về giữa)" />
+                    <ctl:PanBar Grid.Column="1" Width="84" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Value="{Binding Pan, Mode=TwoWay}" AccentColor="{Binding ColorValue}"
+                                IsEnabled="{Binding IsEditable}"
+                                ToolTip.Tip="Pan L/R (double-click để về giữa)" />
                 </Grid>
             </Grid>
         </Grid>

@@ -1,5 +1,5 @@
 using Avalonia.Controls;
-using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using SoundMaster.App.ViewModels;
 
@@ -14,8 +14,10 @@ public partial class TrackHeaderView : UserControl
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
-    private void OnPanDoubleTapped(object? sender, TappedEventArgs e)
-    {
-        if (DataContext is TrackViewModel vm) vm.Pan = 0;
-    }
+    private TrackViewModel? Track => DataContext as TrackViewModel;
+    private MainViewModel? Main => TopLevel.GetTopLevel(this)?.DataContext as MainViewModel;
+
+    private void OnMoveUp(object? sender, RoutedEventArgs e) => Main?.MoveTrackUpCommand.Execute(Track);
+    private void OnMoveDown(object? sender, RoutedEventArgs e) => Main?.MoveTrackDownCommand.Execute(Track);
+    private void OnRemove(object? sender, RoutedEventArgs e) => Main?.RemoveTrackCommand.Execute(Track);
 }

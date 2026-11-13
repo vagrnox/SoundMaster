@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using SoundMaster.Core.Timeline;
 
 namespace SoundMaster.App.Controls;
@@ -35,10 +36,10 @@ public class TimelineRuler : Control
     public static readonly StyledProperty<ICommand?> SeekCommandProperty =
         AvaloniaProperty.Register<TimelineRuler, ICommand?>(nameof(SeekCommand));
 
-    private static readonly IBrush Back = new SolidColorBrush(Color.Parse("#0E0E0E"));
-    private static readonly IBrush LabelBrush = new SolidColorBrush(Color.Parse("#9A9A9A"));
-    private static readonly Pen MajorPen = new(new SolidColorBrush(Color.Parse("#7A7A7A")), 1);
-    private static readonly Pen MinorPen = new(new SolidColorBrush(Color.Parse("#444444")), 1);
+    private static readonly IBrush Back = new ImmutableSolidColorBrush(Color.Parse("#0E0E0E"));
+    private static readonly IBrush LabelBrush = new ImmutableSolidColorBrush(Color.Parse("#9A9A9A"));
+    private static readonly ImmutablePen MajorPen = new(new ImmutableSolidColorBrush(Color.Parse("#7A7A7A")), 1);
+    private static readonly ImmutablePen MinorPen = new(new ImmutableSolidColorBrush(Color.Parse("#444444")), 1);
 
     private bool _dragging;
 

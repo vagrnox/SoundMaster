@@ -59,6 +59,16 @@ public class UiSmokeTests
         vm.Timeline.SeekCommand.Execute(5.0);
         Assert.Equal(5.0, vm.Timeline.PositionSeconds, 3);
 
+        // Phân tích chạy nền: đợi xong để ảnh chụp có LUFS / giọng.
+        for (int i = 0; i < 200 && vm.IsAnalyzing; i++)
+        {
+            Thread.Sleep(50);
+            Dispatcher.UIThread.RunJobs();
+        }
+        Assert.False(vm.IsAnalyzing);
+        Assert.NotNull(vm.Analysis.Lufs);
+        Assert.NotNull(vm.Analysis.Key);
+
         // Khóa một track để ảnh chụp cho thấy trạng thái khóa; đặt volume và mức tín hiệu giả
         // để thấy thanh volume (vạch xanh) và đồng hồ mức gradient bên trong.
         vm.Tracks[1].IsLocked = true;
@@ -80,6 +90,36 @@ public class UiSmokeTests
         window.Close();
     }
 
+
+    [AvaloniaFact]
+    public void MoveAndRemoveTracks_ReorderRenumberAndRespectLock()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var names = vm.Tracks.Select(t => t.Name).ToList();
+
+        Assert.True(vm.MoveTrack(0, 2));
+        Assert.Equal([names[1], names[2], names[0], names[3], names[4]], vm.Tracks.Select(t => t.Name).ToArray());
+        Assert.Equal([1, 2, 3, 4, 5], vm.Tracks.Select(t => t.Index).ToArray());
+
+        // Track khóa không di chuyển / xóa được.
+        vm.Tracks[0].IsLocked = true;
+        Assert.False(vm.MoveTrack(0, 3));
+        vm.RemoveTrackCommand.Execute(vm.Tracks[0]);
+        Assert.Equal(5, vm.Tracks.Count);
+        vm.Tracks[0].IsLocked = false;
+
+        var victim = vm.Tracks[1];
+        vm.RemoveTrackCommand.Execute(victim);
+        Assert.Equal(4, vm.Tracks.Count);
+        Assert.DoesNotContain(victim, vm.Tracks);
+        Assert.Equal([1, 2, 3, 4], vm.Tracks.Select(t => t.Index).ToArray());
+
+        while (vm.Tracks.Count > 0) vm.RemoveTrackCommand.Execute(vm.Tracks[0]);
+        Assert.Equal(0, vm.Timeline.DurationSeconds);
+        window.Close();
+    }
     [AvaloniaFact]
     public void LockingTrack_DisablesItsControls_OnlyForThatTrack()
     {
@@ -93,24 +133,24 @@ public class UiSmokeTests
         var second = headers.First(h => ReferenceEquals(h.DataContext, vm.Tracks[1]));
 
         // Chưa khóa: mọi điều khiển bật.
-        Assert.All(first.GetVisualDescendants().OfType<Slider>(), s => Assert.True(s.IsEnabled));
+        Assert.All(first.GetVisualDescendants().OfType<PanBar>(), s => Assert.True(s.IsEnabled));
         Assert.True(first.GetVisualDescendants().OfType<VolumeBar>().Single().IsEnabled);
 
         vm.Tracks[0].IsLocked = true;
         Dispatcher.UIThread.RunJobs();
 
-        // Còn lại một Slider là pan; volume là VolumeBar.
-        var firstSliders = first.GetVisualDescendants().OfType<Slider>().ToList();
-        Assert.Single(firstSliders);
-        Assert.All(firstSliders, s => Assert.False(s.IsEnabled));
+        // Còn lại một PanBar là pan; volume là VolumeBar.
+        var firstPans = first.GetVisualDescendants().OfType<PanBar>().ToList();
+        Assert.Single(firstPans);
+        Assert.All(firstPans, s => Assert.False(s.IsEnabled));
         Assert.False(first.GetVisualDescendants().OfType<VolumeBar>().Single().IsEnabled);
         Assert.False(first.GetVisualDescendants().OfType<TextBox>().Single().IsEnabled);
-        Assert.All(second.GetVisualDescendants().OfType<Slider>(), s => Assert.True(s.IsEnabled));
+        Assert.All(second.GetVisualDescendants().OfType<PanBar>(), s => Assert.True(s.IsEnabled));
         Assert.True(second.GetVisualDescendants().OfType<VolumeBar>().Single().IsEnabled);
 
         vm.Tracks[0].IsLocked = false;
         Dispatcher.UIThread.RunJobs();
-        Assert.All(first.GetVisualDescendants().OfType<Slider>(), s => Assert.True(s.IsEnabled));
+        Assert.All(first.GetVisualDescendants().OfType<PanBar>(), s => Assert.True(s.IsEnabled));
         Assert.True(first.GetVisualDescendants().OfType<VolumeBar>().Single().IsEnabled);
         window.Close();
     }

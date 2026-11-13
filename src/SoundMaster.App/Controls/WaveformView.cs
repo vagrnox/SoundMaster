@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using SoundMaster.Core.Audio;
 using SoundMaster.Core.Timeline;
 
@@ -41,11 +42,7 @@ public class WaveformView : Control
     public static readonly StyledProperty<int> BeatsPerBarProperty =
         AvaloniaProperty.Register<WaveformView, int>(nameof(BeatsPerBar), 4);
 
-    private static readonly Pen BarPen = new(new SolidColorBrush(Color.Parse("#000000"), 0.30), 1);
-    private static readonly Pen BeatPen = new(new SolidColorBrush(Color.Parse("#000000"), 0.12), 1);
 
-    private static readonly IBrush WaveBrush = new SolidColorBrush(Color.Parse("#000000"), 0.45);
-    private static readonly IBrush TitleBrush = new SolidColorBrush(Color.Parse("#FFFFFF"), 0.92);
     private static readonly IBrush Transparent = Brushes.Transparent;
 
     private bool _dragging;
@@ -83,67 +80,38 @@ public class WaveformView : Control
         double x1 = Math.Min(w, clipRight);
         if (x1 <= x0) return;
 
-        // Khối clip (có khe hở nhỏ phía trên/dưới như ảnh mẫu).
-        var clipRect = new Rect(x0, 3, x1 - x0, h - 6);
-        context.DrawRectangle(TrackBrush ?? Brushes.Gray, null, clipRect, 4, 4);
-
-        // Cột kẻ tối xuyên qua clip, giống ảnh mẫu.
-        using (context.PushClip(clipRect))
-        {
-            foreach (var line in TimelineMath.GridLines(OffsetSeconds, pps, w, Bpm, BeatsPerBar))
-            {
-                double x = Math.Round(line.X) + 0.5;
-                context.DrawLine(line.IsBar ? BarPen : BeatPen, new Point(x, clipRect.Top), new Point(x, clipRect.Bottom));
-            }
-        }
-
-        DrawWaveform(context, track, pps, x0, x1, h);
-
-        if (!string.IsNullOrEmpty(Title))
-        {
-            var text = new FormattedText(Title, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                Typeface.Default, 12, TitleBrush);
-            text.MaxTextWidth = Math.Max(1, clipRight - Math.Max(0, clipLeft) - 20);
-            text.MaxTextHeight = 18;
-            context.DrawText(text, new Point(Math.Max(10, clipLeft + 10), 8));
-        }
+        DrawBars(context, track, pps, x0, x1, h);
     }
 
-    private void DrawWaveform(DrawingContext context, AudioTrack track, double pps, double x0, double x1, double h)
+    /// <summary>
+    /// Waveform dạng cột đứng mảnh (rộng 2 px, cách 4 px) theo màu track, đối xứng quanh trục giữa.
+    /// Cột được căn theo tọa độ thế giới nên khi cuộn các cột không nhấp nháy.
+    /// </summary>
+    private void DrawBars(DrawingContext context, AudioTrack track, double pps, double x0, double x1, double h)
     {
+        const double step = 4, barWidth = 2;
         double bucketSec = AudioTrack.PeakBucketFrames / (double)EngineFormat.SampleRate;
         double mid = h / 2;
         double maxAmp = h / 2 - 8;
+        var brush = TrackBrush ?? Brushes.Gray;
 
-        int firstPx = (int)Math.Floor(x0);
-        int lastPx = (int)Math.Ceiling(x1);
-        var tops = new List<Point>(lastPx - firstPx + 1);
-        var bottoms = new List<Point>(lastPx - firstPx + 1);
+        double worldLeft = OffsetSeconds * pps;
+        int firstCol = (int)Math.Floor((worldLeft + x0) / step);
+        int lastCol = (int)Math.Ceiling((worldLeft + x1) / step);
 
-        for (int x = firstPx; x < lastPx; x++)
+        for (int c = firstCol; c < lastCol; c++)
         {
-            double t0 = OffsetSeconds + x / pps;
-            double t1 = OffsetSeconds + (x + 1) / pps;
+            double x = c * step - worldLeft;
+            double t0 = c * step / pps;
+            double t1 = (c + 1) * step / pps;
             int b0 = (int)Math.Floor(t0 / bucketSec);
             int b1 = Math.Max(b0 + 1, (int)Math.Ceiling(t1 / bucketSec));
             double peak = TimelineMath.MaxPeak(track.Peaks, b0, b1);
-            double amp = Math.Max(0.75, peak * maxAmp);
-            tops.Add(new Point(x, mid - amp));
-            bottoms.Add(new Point(x, mid + amp));
+
+            // Im lặng vẫn vẽ chấm 1 px để thành đường đứt nét ở giữa, như ảnh mẫu.
+            double amp = Math.Max(0.5, peak * maxAmp);
+            context.DrawRectangle(brush, null, new Rect(x, mid - amp, barWidth, amp * 2), 1, 1);
         }
-
-        if (tops.Count < 2) return;
-
-        var geometry = new StreamGeometry();
-        using (var g = geometry.Open())
-        {
-            g.BeginFigure(tops[0], true);
-            for (int i = 1; i < tops.Count; i++) g.LineTo(tops[i]);
-            for (int i = bottoms.Count - 1; i >= 0; i--) g.LineTo(bottoms[i]);
-            g.EndFigure(true);
-        }
-
-        context.DrawGeometry(WaveBrush, null, geometry);
     }
 
     // ---------- tua bằng chuột ----------

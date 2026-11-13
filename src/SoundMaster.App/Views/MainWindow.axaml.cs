@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using SoundMaster.App.Controls;
 using SoundMaster.App.ViewModels;
 using SoundMaster.Core.Audio;
@@ -43,6 +44,15 @@ public partial class MainWindow : Window
         _laneScroll.ScrollChanged += (_, _) => SyncVerticalScroll(_laneScroll, _headerScroll);
 
         _workspace.AddHandler(PointerWheelChangedEvent, OnWorkspaceWheel, RoutingStrategies.Tunnel);
+
+        _headerScroll.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
+        _headerScroll.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel);
+        _headerScroll.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel);
+
+        // Kéo file âm thanh thả vào bất kỳ đâu trong vùng làm việc để tạo track mới.
+        DragDrop.SetAllowDrop(_workspace, true);
+        _workspace.AddHandler(DragDrop.DragOverEvent, OnWorkspaceDragOver);
+        _workspace.AddHandler(DragDrop.DropEvent, OnWorkspaceDrop);
 
         Closed += (_, _) => (DataContext as IDisposable)?.Dispose();
     }
@@ -87,6 +97,53 @@ public partial class MainWindow : Window
         }
     }
 
+    // ---------- kéo số thứ tự để đổi thứ tự track ----------
+
+    /// <summary>Phải khớp chiều cao một hàng track (TrackViewModel.RowHeight).</summary>
+    private const double TrackRowHeight = TrackViewModel.RowHeight;
+
+    private int _dragIndex = -1;
+
+    private void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm is null || !e.GetCurrentPoint(_headerScroll).Properties.IsLeftButtonPressed) return;
+        if (e.Source is not Visual src || !IsInGrip(src)) return;
+
+        int index = RowIndexAt(e);
+        if (index < 0 || index >= Vm.Tracks.Count || Vm.Tracks[index].IsLocked) return;
+
+        _dragIndex = index;
+        e.Pointer.Capture(_headerScroll);
+        e.Handled = true;
+    }
+
+    private void OnHeaderMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragIndex < 0 || Vm is null) return;
+        int target = Math.Clamp(RowIndexAt(e), 0, Vm.Tracks.Count - 1);
+        // Đổi chỗ ngay khi con trỏ vượt sang hàng khác (sắp xếp trực tiếp).
+        if (target != _dragIndex && Vm.MoveTrack(_dragIndex, target)) _dragIndex = target;
+    }
+
+    private void OnHeaderReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_dragIndex < 0) return;
+        _dragIndex = -1;
+        e.Pointer.Capture(null);
+    }
+
+    private int RowIndexAt(PointerEventArgs e)
+        => (int)Math.Floor((e.GetPosition(_headerScroll).Y + _headerScroll.Offset.Y) / TrackRowHeight);
+
+    private static bool IsInGrip(Visual v)
+    {
+        for (Visual? cur = v; cur is not null; cur = cur.GetVisualParent())
+        {
+            if (cur is Border b && b.Classes.Contains("grip")) return true;
+        }
+        return false;
+    }
+
     // ---------- nạp stem ----------
 
     private async void OnOpenFolder(object? sender, RoutedEventArgs e)
@@ -119,6 +176,29 @@ public partial class MainWindow : Window
 
     private void OnLoadDemo(object? sender, RoutedEventArgs e) => Vm?.LoadDemoCommand.Execute(null);
     private void OnClear(object? sender, RoutedEventArgs e) => Vm?.ClearCommand.Execute(null);
+
+    // ---------- kéo thả file để tạo track mới ----------
+
+    private static bool HasFiles(DragEventArgs e) => e.DataTransfer.Contains(DataFormat.File);
+
+    private void OnWorkspaceDragOver(object? sender, DragEventArgs e)
+    {
+        bool ok = Vm is { IsBusy: false } && HasFiles(e);
+        e.DragEffects = ok ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnWorkspaceDrop(object? sender, DragEventArgs e)
+    {
+        if (Vm is null || Vm.IsBusy) return;
+        var paths = (e.DataTransfer.TryGetFiles() ?? [])
+            .Select(f => f.TryGetLocalPath())
+            .OfType<string>()
+            .Where(p => System.IO.File.Exists(p))
+            .ToList();
+        e.Handled = true;
+        if (paths.Count > 0) await Vm.LoadFilesAsync(paths, replace: false);
+    }
 
     // ---------- xuất file ----------
 

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 
 namespace SoundMaster.App.Controls;
 
@@ -32,10 +33,10 @@ public class VolumeBar : Control
     public static readonly StyledProperty<Color> AccentColorProperty =
         AvaloniaProperty.Register<VolumeBar, Color>(nameof(AccentColor), Color.Parse("#3DDC84"));
 
-    private static readonly IBrush PillBrush = new SolidColorBrush(Color.Parse("#000000"));
-    private static readonly IPen BorderPen = new Pen(new SolidColorBrush(Color.Parse("#2E2E2E")), 1);
-    private static readonly IPen UnityPen = new Pen(new SolidColorBrush(Color.Parse("#FFFFFF"), 0.22), 1);
-    private static readonly IBrush ThumbBrush = new SolidColorBrush(Color.Parse("#3DDC84"));
+    private static readonly IBrush PillBrush = new ImmutableSolidColorBrush(Color.Parse("#000000"));
+    private static readonly IPen BorderPen = new ImmutablePen(new ImmutableSolidColorBrush(Color.Parse("#2E2E2E")), 1);
+    private static readonly IPen UnityPen = new ImmutablePen(new ImmutableSolidColorBrush(Color.Parse("#FFFFFF"), 0.22), 1);
+    private static readonly IBrush ThumbBrush = new ImmutableSolidColorBrush(Color.Parse("#3DDC84"));
 
     private bool _dragging;
 

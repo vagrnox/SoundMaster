@@ -7,6 +7,16 @@
     <Application.DataTemplates>
         <local:ViewLocator />
     </Application.DataTemplates>
+    <Application.Resources>
+        <!-- Màu chủ đạo (primary) của app -->
+        <Color x:Key="PrimaryColor">#F1AB29</Color>
+        <!-- Màu nhấn của theme Fluent (thanh trượt pan, focus...) cũng dùng primary -->
+        <Color x:Key="SystemAccentColor">#F1AB29</Color>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}" />
+        <!-- Khoảng trống dưới track cuối: vùng thả file để tạo track mới -->
+        <x:Double x:Key="DropZoneHeight">200</x:Double>
+    </Application.Resources>
+
 
     <Application.Styles>
         <FluentTheme />
@@ -35,6 +45,54 @@
             <Setter Property="Foreground" Value="#555555" />
         </Style>
 
+        <!-- Nút nhấn (vàng) và nút transport -->
+        <Style Selector="Button.gold">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="#111111" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.gold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#FFC420" />
+            <Setter Property="Foreground" Value="#111111" />
+        </Style>
+        <Style Selector="Button.gold:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#7A5C0A" />
+        </Style>
+        <Style Selector="Button.round, ToggleButton.round">
+            <Setter Property="Background" Value="#1F1F1F" />
+            <Setter Property="Foreground" Value="#E8E8E8" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="Button.round:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.round:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2C2C2C" />
+        </Style>
+        <Style Selector="Button.round.gold">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="#111111" />
+        </Style>
+        <Style Selector="Button.round.gold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#FFC420" />
+        </Style>
+        <Style Selector="ToggleButton.round:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="#111111" />
+        </Style>
+
+        <!-- Thông tin file xuất bản (chân cửa sổ) -->
+        <Style Selector="TextBlock.infoKey">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="TextBlock.infoVal">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+
         <!-- Nút tròn nhỏ M / S / A trong sidebar -->
         <Style Selector="ToggleButton.mini">
             <Setter Property="Width" Value="26" />
@@ -55,20 +113,35 @@
             <Setter Property="Background" Value="#363636" />
         </Style>
         <Style Selector="ToggleButton.mini.mute:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#8A2A2A" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="#111111" />
         </Style>
         <Style Selector="ToggleButton.mini.solo:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#F5C542" />
-            <Setter Property="Foreground" Value="#000000" />
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="#111111" />
         </Style>
         <Style Selector="ToggleButton.mini.lock:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#FF9800" />
-            <Setter Property="Foreground" Value="#000000" />
+            <Setter Property="Background" Value="#3A3A3A" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
         </Style>
         <Style Selector="ToggleButton.mini.arm:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#E53935" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="#111111" />
+        </Style>
+
+        <!-- Nút "+ Add new track" ở chân sidebar: chữ chuyển màu primary khi rê chuột -->
+        <Style Selector="Button.addTrack">
+            <Setter Property="Background" Value="#101010" />
+            <Setter Property="Foreground" Value="#B3B3B3" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <Style Selector="Button.addTrack:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#141414" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+        </Style>
+        <Style Selector="Button.addTrack:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
         </Style>
 
         <!-- Nút chấm màu -->
@@ -98,6 +171,22 @@
         </Style>
         <Style Selector="TextBox.flat:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="#262626" />
+        </Style>
+
+        <!-- Thanh phân tích: nhãn / giá trị / chú thích -->
+        <Style Selector="TextBlock.statLabel">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="LetterSpacing" Value="1" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="TextBlock.statValue">
+            <Setter Property="FontFamily" Value="Consolas,monospace" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.statSub">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Opacity" Value="0.5" />
         </Style>
     </Application.Styles>
 </Application>

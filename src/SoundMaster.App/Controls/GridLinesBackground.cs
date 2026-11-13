@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using SoundMaster.Core.Timeline;
 
 namespace SoundMaster.App.Controls;
@@ -20,9 +21,9 @@ public class GridLinesBackground : Control
     public static readonly StyledProperty<int> BeatsPerBarProperty =
         AvaloniaProperty.Register<GridLinesBackground, int>(nameof(BeatsPerBar), 4);
 
-    private static readonly IBrush Back = new SolidColorBrush(Color.Parse("#121212"));
-    private static readonly Pen BarPen = new(new SolidColorBrush(Color.Parse("#FFFFFF"), 0.10), 1);
-    private static readonly Pen BeatPen = new(new SolidColorBrush(Color.Parse("#FFFFFF"), 0.045), 1);
+    private static readonly IBrush Back = new ImmutableSolidColorBrush(Color.Parse("#0A0D11"));
+    private static readonly ImmutablePen BarPen = new(new ImmutableSolidColorBrush(Color.Parse("#FFFFFF"), 0.07), 1);
+    private static readonly ImmutablePen BeatPen = new(new ImmutableSolidColorBrush(Color.Parse("#FFFFFF"), 0.03), 1);
 
     static GridLinesBackground()
     {

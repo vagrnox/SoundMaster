@@ -24,23 +24,23 @@
 
         <!-- ================= Toolbar trên ================= -->
         <Border DockPanel.Dock="Top" Background="#0B0B0B" Padding="12,8">
-            <Grid ColumnDefinitions="Auto,*,Auto">
+            <!-- Cột 1 (logo + tên bài, 50%) | cột 2 (undo, thời gian) | cột 3 (export) -->
+            <Grid ColumnDefinitions="*,Auto,*">
 
-                <!-- Logo (placeholder) + tên bài hát + menu -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
-                    <Border Width="96" Height="34" CornerRadius="6" Background="#1F1F1F"
-                            VerticalAlignment="Center" ToolTip.Tip="Logo (placeholder)">
-                        <TextBlock Text="LOGO" FontWeight="Bold" FontSize="15" LetterSpacing="3"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.8" />
+                <!-- Logo + tên bài hát (rộng 50% toolbar) + menu -->
+                <Grid Grid.Column="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,12,0">
+                    <views:LogoMark Grid.Column="0" Width="30" Height="34" VerticalAlignment="Center"
+                                    Margin="0,0,12,0" ToolTip.Tip="SoundMaster" />
+
+                    <Border Grid.Column="1" Background="#2A2A2A" CornerRadius="18" VerticalAlignment="Center">
+                        <TextBox Classes="flat" Text="{Binding SongName}" FontSize="14"
+                                 PlaceholderText="Tên bài hát khi xuất bản"
+                                 VerticalContentAlignment="Center" CornerRadius="18"
+                                 Padding="14,8"
+                                 ToolTip.Tip="Tên bài hát (dùng làm tên file khi xuất)" />
                     </Border>
 
-                    <TextBox Classes="flat" Text="{Binding SongName}" Width="220" FontSize="14"
-                             PlaceholderText="Tên bài hát khi xuất bản" VerticalAlignment="Center"
-                             VerticalContentAlignment="Center"
-                             Padding="12,8" CornerRadius="18" Background="#1F1F1F"
-                             ToolTip.Tip="Tên bài hát (dùng làm tên file khi xuất)" />
-
-                    <Button Classes="pill" Content="•••" ToolTip.Tip="Mở / nạp stem">
+                    <Button Grid.Column="2" Classes="pill" Content="•••" Margin="12,0,0,0" ToolTip.Tip="Mở / nạp stem">
                         <Button.Flyout>
                             <MenuFlyout>
                                 <MenuItem Header="📂  Mở thư mục stems…" Click="OnOpenFolder" />
@@ -51,10 +51,10 @@
                             </MenuFlyout>
                         </Button.Flyout>
                     </Button>
-                </StackPanel>
+                </Grid>
 
-                <!-- Undo/redo, thời gian, BPM / nhịp / giọng -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="24,0,0,0">
+                <!-- Undo/redo, thời gian -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
                     <StackPanel Orientation="Horizontal" Spacing="2">
                         <Button Classes="pill" Content="↶" IsEnabled="False" Padding="14,8,10,8"
                                 ToolTip.Tip="Undo (chưa hỗ trợ)" />
@@ -62,109 +62,229 @@
                                 ToolTip.Tip="Redo (chưa hỗ trợ)" />
                     </StackPanel>
 
-                    <Border Background="#1F1F1F" CornerRadius="18" Padding="16,8" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="22">
-                            <TextBlock Text="{Binding Timeline.ClockText}" FontFamily="Consolas,monospace" FontSize="13" />
-                            <TextBlock Text="{Binding Timeline.BarsText}" FontFamily="Consolas,monospace" FontSize="13" />
-                        </StackPanel>
-                    </Border>
 
-                    <Border Background="#1F1F1F" CornerRadius="18" Padding="16,4" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="14">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBox Classes="flat" Text="{Binding Timeline.BpmText}" Width="46" FontSize="13"
-                                         FontFamily="Consolas,monospace" Padding="2,0"
-                                         Height="26" MinHeight="26"
-                                         HorizontalContentAlignment="Right" VerticalContentAlignment="Center"
-                                         VerticalAlignment="Center" ToolTip.Tip="BPM (30–300)" />
-                                <TextBlock Text="BPM" FontFamily="Consolas,monospace" FontSize="13"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                            <!-- Đường kẻ mờ phân cách -->
-                            <Border Width="1" Height="18" Background="#33FFFFFF" VerticalAlignment="Center" />
-                            <TextBlock Text="4/4" FontFamily="Consolas,monospace" FontSize="13" VerticalAlignment="Center"
-                                       ToolTip.Tip="Nhịp (cố định 4/4)" />
-                            <Border Width="1" Height="18" Background="#33FFFFFF" VerticalAlignment="Center" />
-                            <TextBlock Text="C maj" FontFamily="Consolas,monospace" FontSize="13" VerticalAlignment="Center"
-                                       ToolTip.Tip="Giọng (placeholder, chưa phân tích)" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- Export -->
-                <Button Grid.Column="2" Classes="pill" ToolTip.Tip="Xuất bản mix ra WAV"
-                        IsEnabled="{Binding !IsBusy}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="⤴" />
-                        <TextBlock Text="Export" />
-                    </StackPanel>
-                    <Button.Flyout>
-                        <MenuFlyout>
-                            <MenuItem Header="WAV 16-bit" Click="OnExport16" />
-                            <MenuItem Header="WAV 24-bit" Click="OnExport24" />
-                            <MenuItem Header="WAV 32-bit float" Click="OnExport32" />
-                        </MenuFlyout>
-                    </Button.Flyout>
-                </Button>
-            </Grid>
-        </Border>
-
-        <!-- ================= Toolbar dưới ================= -->
-        <Border DockPanel.Dock="Bottom" Background="#0B0B0B" Padding="12,8">
-            <Grid ColumnDefinitions="*,Auto,*">
-                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <ProgressBar IsIndeterminate="True" Width="60" Height="6" IsVisible="{Binding IsBusy}" />
-                        <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.75" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="420" />
-                    </StackPanel>
-                    <!-- Chỉ hiện khi không mở được thiết bị âm thanh -->
-                    <TextBlock Text="{Binding AudioError}" FontSize="11" Foreground="#FF6B6B"
-                               TextTrimming="CharacterEllipsis" MaxWidth="420"
-                               IsVisible="{Binding HasAudioError}" />
-                </StackPanel>
-
-                <!-- Cụm transport căn giữa: back / record / play / loop -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                    <Button Classes="pill" Content="⏮" Command="{Binding ToStartCommand}" FontSize="15"
-                            ToolTip.Tip="Về đầu bài" />
-                    <Button Classes="pill" Content="⏺" IsEnabled="False" FontSize="15" Foreground="#E53935"
-                            ToolTip.Tip="Ghi âm (chưa hỗ trợ)" />
-                    <Button Classes="pill" Content="{Binding PlayPauseText}" Command="{Binding PlayPauseCommand}"
-                            FontSize="16" MinWidth="64" HorizontalContentAlignment="Center"
-                            ToolTip.Tip="Play / Pause (Ctrl+Space)" />
-                    <ToggleButton Classes="pill" Content="🔁" IsChecked="{Binding LoopEnabled}" FontSize="15"
-                                  ToolTip.Tip="Lặp lại" />
                 </StackPanel>
 
                 <!-- Zoom -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
                     <Button Classes="pill" Content="−" Command="{Binding ZoomOutCommand}" Padding="14,6"
                             ToolTip.Tip="Thu nhỏ (Ctrl + lăn chuột)" />
                     <Button Classes="pill" Content="⇹" Command="{Binding ZoomFitCommand}" Padding="14,6"
                             ToolTip.Tip="Vừa khít cả bài" />
-                    <Button Classes="pill" Content="＋" Command="{Binding ZoomInCommand}" Padding="14,6"
+                    <Button Classes="pill" Content="+" Command="{Binding ZoomInCommand}" Padding="14,6"
                             ToolTip.Tip="Phóng to (Ctrl + lăn chuột)" />
                 </StackPanel>
+
+            </Grid>
+        </Border>
+
+        <!-- ================= Thanh phân tích (dưới toolbar chính) ================= -->
+        <Border DockPanel.Dock="Top" Background="#0B0B0B" BorderBrush="#1E1E1E" BorderThickness="0,1,0,1">
+            <Grid ColumnDefinitions="*,*,*,1.3*,*,*,1.2*,1.2*">
+                <!-- KEY (dò từ audio) -->
+                <Border Grid.Column="0" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="KEY" />
+                        <TextBlock Classes="statValue" Text="{Binding Analysis.KeyText}"
+                                   ToolTip.Tip="Giọng dò từ audio (chroma + Krumhansl-Schmuckler)" />
+                        <TextBlock Classes="statSub" Text="{Binding Analysis.ScaleText}" />
+                    </StackPanel>
+                </Border>
+                <!-- BPM (sửa trực tiếp) -->
+                <Border Grid.Column="1" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="BPM" />
+                        <TextBox Classes="flat" Text="{Binding Timeline.BpmText}" Foreground="{DynamicResource PrimaryBrush}"
+                                 FontFamily="Consolas,monospace" FontSize="20" FontWeight="SemiBold"
+                                 Padding="0" Height="28" MinHeight="28" Width="90" HorizontalAlignment="Left"
+                                 VerticalContentAlignment="Center" ToolTip.Tip="BPM (30–300)" />
+                        <TextBlock Classes="statSub" Text="Tempo" />
+                    </StackPanel>
+                </Border>
+                <!-- Nhịp -->
+                <Border Grid.Column="2" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="TIME SIGNATURE" />
+                        <TextBlock Classes="statValue" Text="4/4" ToolTip.Tip="Nhịp (cố định 4/4)" />
+                        <TextBlock Classes="statSub" Text="Simple" />
+                    </StackPanel>
+                </Border>
+                <!-- Đang phát: thời gian + bar.beat -->
+                <Border Grid.Column="3" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="PLAYING" />
+                        <TextBlock Classes="statValue" Foreground="{DynamicResource PrimaryBrush}" Text="{Binding Timeline.ClockText}" />
+                        <TextBlock Classes="statSub" Text="{Binding Timeline.BarsText}" FontFamily="Consolas,monospace" />
+                    </StackPanel>
+                </Border>
+                <!-- Thời lượng -->
+                <Border Grid.Column="4" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="DURATION" />
+                        <TextBlock Classes="statValue" Text="{Binding Timeline.DurationText}" />
+                        <TextBlock Classes="statSub" Text="mm:ss" />
+                    </StackPanel>
+                </Border>
+                <!-- LUFS -->
+                <Border Grid.Column="5" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="LUFS" />
+                        <TextBlock Classes="statValue" Foreground="{DynamicResource PrimaryBrush}" Text="{Binding Analysis.LufsText}"
+                                   ToolTip.Tip="Độ ồn tích hợp ITU-R BS.1770 của các stem cộng ở mức gốc (chưa tính fader)" />
+                        <TextBlock Classes="statSub" Text="{Binding Analysis.PeakText}" />
+                    </StackPanel>
+                </Border>
+                <!-- Dynamic range -->
+                <Border Grid.Column="6" Padding="16,8" BorderBrush="#1E1E1E" BorderThickness="0,0,1,0">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="DYNAMIC RANGE" />
+                        <TextBlock Classes="statValue" Text="{Binding Analysis.DynamicRangeText}"
+                                   ToolTip.Tip="Đỉnh (dBFS) trừ LUFS tích hợp, đơn vị dB" />
+                        <TextBlock Classes="statSub" Text="{Binding Analysis.DynamicRangeLabel}" />
+                    </StackPanel>
+                </Border>
+                <!-- Tempo stability -->
+                <Border Grid.Column="7" Padding="16,8">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="statLabel" Text="TEMPO STABILITY" />
+                        <TextBlock Classes="statValue" Foreground="{DynamicResource PrimaryBrush}" Text="{Binding Analysis.TempoStabilityText}"
+                                   ToolTip.Tip="Mức đều của nhịp: so tempo từng đoạn 8 s với tempo toàn bài" />
+                        <TextBlock Classes="statSub" Text="{Binding Analysis.TempoStabilityLabel}" IsVisible="{Binding !IsAnalyzing}" />
+                        <TextBlock Classes="statSub" Text="Đang phân tích…" IsVisible="{Binding IsAnalyzing}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ================= Toolbar dưới ================= -->
+        <Border DockPanel.Dock="Bottom" Background="#0B0B0B" BorderBrush="#1E1E1E" BorderThickness="0,1,0,0"
+                Padding="16,10,16,6">
+            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,*">
+
+                    <!-- Trái: thông tin file sẽ xuất bản (placeholder, sau này cho nhập) -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <!-- Ảnh bìa (placeholder) -->
+                        <Border Width="72" Height="72" CornerRadius="6" BorderBrush="#2A2A2A" BorderThickness="1"
+                                VerticalAlignment="Center" ToolTip.Tip="Ảnh bìa (placeholder)">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="#2B2F4A" Offset="0" />
+                                    <GradientStop Color="#4A2B5A" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <TextBlock Text="♪" FontSize="28" Opacity="0.6"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Spacing="3" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding SongName}" FontSize="16" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="320" VerticalAlignment="Center" />
+                                <TextBlock Text="♡" FontSize="16" Opacity="0.6" VerticalAlignment="Center"
+                                           ToolTip.Tip="Yêu thích (chưa hỗ trợ)" />
+                            </StackPanel>
+                            <Grid ColumnDefinitions="62,*" RowDefinitions="Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Classes="infoKey" Text="Source" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Classes="infoVal" Text="{Binding ExportSource}" />
+                                <TextBlock Grid.Row="1" Classes="infoKey" Text="Created" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Classes="infoVal" Text="{Binding ExportCreated}" />
+                                <TextBlock Grid.Row="2" Classes="infoKey" Text="Quality" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Classes="infoVal" Text="{Binding ExportQuality}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Giữa: back to top / stop / play / loop, thời gian bên dưới -->
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center">
+                            <Button Classes="round" Width="44" Height="44" CornerRadius="10"
+                                    Command="{Binding ToStartCommand}" ToolTip.Tip="Về đầu bài (giữ nguyên trạng thái phát)">
+                                <PathIcon Width="18" Height="18" Data="M5,4 H8 V20 H5 Z M20,4 V20 L9,12 Z" />
+                            </Button>
+                            <Button Classes="round" Width="44" Height="44" CornerRadius="10"
+                                    Command="{Binding StopCommand}" ToolTip.Tip="Dừng và về đầu bài">
+                                <Border Width="13" Height="13" CornerRadius="2" Background="#E8E8E8" />
+                            </Button>
+                            <Button Classes="round gold" Width="56" Height="56" CornerRadius="28"
+                                    Command="{Binding PlayPauseCommand}" ToolTip.Tip="Play / Pause (Ctrl+Space)">
+                                <Panel>
+                                    <PathIcon Width="20" Height="20" Foreground="#111111"
+                                              Data="M7,4 L19,12 L7,20 Z" IsVisible="{Binding !IsPlaying}" />
+                                    <PathIcon Width="20" Height="20" Foreground="#111111"
+                                              Data="M6,4 H10 V20 H6 Z M14,4 H18 V20 H14 Z" IsVisible="{Binding IsPlaying}" />
+                                </Panel>
+                            </Button>
+                            <ToggleButton Classes="round" Width="44" Height="44" CornerRadius="10"
+                                          IsChecked="{Binding LoopEnabled}" ToolTip.Tip="Lặp lại">
+                                <PathIcon Width="18" Height="18"
+                                          Data="M17,2 L21,6 L17,10 V7 H6 V11 H4 V5 H17 Z M7,22 L3,18 L7,14 V17 H18 V13 H20 V19 H7 Z" />
+                            </ToggleButton>
+                        </StackPanel>
+                        <TextBlock HorizontalAlignment="Center" FontFamily="Consolas,monospace" FontSize="13">
+                            <Run Text="{Binding Timeline.PositionShortText}" />
+                            <Run Text=" / " Foreground="#80FFFFFF" />
+                            <Run Text="{Binding Timeline.DurationShortText}" />
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Phải: tốc độ (chưa hỗ trợ), export, dòng trạng thái -->
+                    <StackPanel Grid.Column="2" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                            <Button Classes="pill" IsEnabled="False" ToolTip.Tip="Tốc độ phát (chưa hỗ trợ)">
+                                <TextBlock Text="◷  Speed 1.0x  ⌄" FontSize="12" />
+                            </Button>
+                            <Button Classes="gold" Padding="16,10" CornerRadius="8" FontWeight="SemiBold"
+                                    ToolTip.Tip="Xuất bản mix ra WAV" IsEnabled="{Binding !IsBusy}">
+                                <TextBlock Text="⤓  Export Mix  ⌄" />
+                                <Button.Flyout>
+                                    <MenuFlyout>
+                                        <MenuItem Header="WAV 16-bit" Click="OnExport16" />
+                                        <MenuItem Header="WAV 24-bit" Click="OnExport24" />
+                                        <MenuItem Header="WAV 32-bit float" Click="OnExport32" />
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                        </StackPanel>
+                        <!-- Trạng thái -->
+                        <StackPanel HorizontalAlignment="Right" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                                <ProgressBar IsIndeterminate="True" Width="60" Height="6" IsVisible="{Binding IsBusy}" />
+                                <TextBlock Text="{Binding Status}" FontSize="11" Opacity="0.65"
+                                           VerticalAlignment="Center" HorizontalAlignment="Right"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="380" />
+                            </StackPanel>
+                            <!-- Chỉ hiện khi không mở được thiết bị âm thanh -->
+                            <TextBlock Text="{Binding AudioError}" FontSize="11" Foreground="#FF6B6B"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="380" HorizontalAlignment="Right"
+                                       IsVisible="{Binding HasAudioError}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Waveform tổng quan toàn bài: bấm / kéo để tua -->
+                <ctl:OverviewWaveform Grid.Row="1" Height="22"
+                                      Peaks="{Binding OverviewPeaks}"
+                                      PositionSeconds="{Binding Timeline.PositionSeconds}"
+                                      DurationSeconds="{Binding Timeline.DurationSeconds}"
+                                      SeekCommand="{Binding Timeline.SeekCommand}" />
             </Grid>
         </Border>
 
         <!-- ================= Vùng làm việc ================= -->
         <Grid x:Name="Workspace" ColumnDefinitions="300,*" RowDefinitions="44,*,26,14">
 
-            <!-- Ô TRACKS: volume tổng + limiter + khóa -->
-            <Border Grid.Row="0" Grid.Column="0" Background="#141414" BorderBrush="#000000" BorderThickness="0,0,0,1">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="12,0,10,0">
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="0">
-                        <TextBlock Text="TRACKS" FontSize="11" FontWeight="SemiBold" Opacity="0.7" />
-                        <TextBlock Text="{Binding Tracks.Count}" FontSize="10" Opacity="0.45" />
-                    </StackPanel>
-
+            <!-- Ô đầu sidebar: volume tổng + limiter + khóa -->
+            <Border Grid.Row="0" Grid.Column="0" Background="#141414" BorderBrush="#4A4F57" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="22,*,Auto,Auto" Margin="13,0,10,0">
+                    <!-- Số track (cùng cột với số thứ tự của từng track) -->
+                    <TextBlock Grid.Column="0" Text="{Binding Tracks.Count}" FontSize="11" Opacity="0.55"
+                               VerticalAlignment="Center" ToolTip.Tip="Số track" />
                     <!-- Volume tổng: cùng kiểu thanh volume với các track (gradient màu trắng xám) -->
-                    <ctl:VolumeBar Grid.Column="1" Margin="12,0,6,0" VerticalAlignment="Center"
+                    <ctl:VolumeBar Grid.Column="1" Margin="0,0,18,0" VerticalAlignment="Center"
                                    ValueDb="{Binding MasterGainDb, Mode=TwoWay}"
                                    LeftDb="{Binding MasterMeterLeftDb}" RightDb="{Binding MasterMeterRightDb}"
-                                   AccentColor="#D5DDE3"
+                                   AccentColor="{Binding MasterAccentColor}"
                                    IsEnabled="{Binding IsMasterEditable}"
                                    ToolTip.Tip="{Binding MasterGainText}" />
 
@@ -181,18 +301,10 @@
                 </Grid>
             </Border>
 
-            <DockPanel Grid.Row="1" Grid.RowSpan="3" Grid.Column="0" Background="#141414">
-                <!-- Khối ghim ở chân sidebar: + Add new track -->
-                <Button DockPanel.Dock="Bottom" Height="48" HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Background="#101010" BorderThickness="0" CornerRadius="0"
-                        Click="OnAddFiles" IsEnabled="{Binding !IsBusy}"
-                        ToolTip.Tip="Thêm track mới từ file âm thanh">
-                    <TextBlock Text="＋  Add new track" Opacity="0.7" />
-                </Button>
-
-                <ScrollViewer x:Name="HeaderScroll" VerticalScrollBarVisibility="Hidden"
-                              HorizontalScrollBarVisibility="Disabled">
+            <!-- Danh sách header track (cùng chiều cao viewport với các lane để cuộn đồng bộ) -->
+            <ScrollViewer x:Name="HeaderScroll" Grid.Row="1" Grid.Column="0" Background="#141414"
+                          VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
                     <ItemsControl ItemsSource="{Binding Tracks}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TrackViewModel">
@@ -200,8 +312,23 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
+                    <!-- Khoảng thừa dưới track cuối (khớp với vùng thả file bên phải), có lời nhắc căn giữa -->
+                    <Border Height="{StaticResource DropZoneHeight}" Padding="16">
+                        <TextBlock Text="Thả file âm thanh vào đây để tạo track mới" FontSize="12" Opacity="0.35"
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Nút ghim ở chân sidebar: + Add new track -->
+            <Button Grid.Row="2" Grid.RowSpan="2" Grid.Column="0" Classes="addTrack"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Click="OnAddFiles" IsEnabled="{Binding !IsBusy}"
+                    ToolTip.Tip="Thêm track mới từ file âm thanh (hoặc kéo thả file vào vùng timeline)">
+                <TextBlock Text="+  Add new track" VerticalAlignment="Center" />
+            </Button>
 
             <!-- Thước nhịp (trên) -->
             <ctl:TimelineRuler x:Name="BarRuler" Grid.Row="0" Grid.Column="1" Mode="Bars"
@@ -209,6 +336,10 @@
                                OffsetSeconds="{Binding Timeline.OffsetSeconds}"
                                Bpm="{Binding Timeline.Bpm}"
                                SeekCommand="{Binding Timeline.SeekCommand}" />
+
+            <!-- Đường viền xám sáng dưới hàng trên cùng (tách hàng master với các track) -->
+            <Border Grid.Row="0" Grid.Column="1" BorderBrush="#4A4F57" BorderThickness="0,0,0,1"
+                    IsHitTestVisible="False" ZIndex="5" />
 
             <!-- Nền lưới dạng cột (ô nhịp / phách), kéo dài cả phần trống dưới các track -->
             <ctl:GridLinesBackground Grid.Row="1" Grid.Column="1"
@@ -219,21 +350,25 @@
             <!-- Các lane -->
             <ScrollViewer x:Name="LaneScroll" Grid.Row="1" Grid.Column="1"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding Tracks}" Margin="0,0,0,8">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:TrackViewModel">
-                            <Border Height="104" BorderBrush="#000000" BorderThickness="0,0,0,2">
-                                <ctl:WaveformView Track="{Binding Audio}"
-                                                  TrackBrush="{Binding ColorBrush}"
-                                                  Title="{Binding Name}"
-                                                  PixelsPerSecond="{Binding Timeline.PixelsPerSecond}"
-                                                  OffsetSeconds="{Binding Timeline.OffsetSeconds}"
-                                                  Bpm="{Binding Timeline.Bpm}"
-                                                  SeekCommand="{Binding Timeline.SeekCommand}" />
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <StackPanel>
+                    <ItemsControl ItemsSource="{Binding Tracks}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TrackViewModel">
+                                <Border Height="68" Background="{Binding LaneBackground}" BorderBrush="#06080B" BorderThickness="0,0,0,3">
+                                    <ctl:WaveformView Track="{Binding Audio}"
+                                                      TrackBrush="{Binding ColorBrush}"
+                                                      Title="{Binding Name}"
+                                                      PixelsPerSecond="{Binding Timeline.PixelsPerSecond}"
+                                                      OffsetSeconds="{Binding Timeline.OffsetSeconds}"
+                                                      Bpm="{Binding Timeline.Bpm}"
+                                                      SeekCommand="{Binding Timeline.SeekCommand}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Vùng thả file: kéo file âm thanh vào đây để tạo track mới -->
+                    <Border Height="{StaticResource DropZoneHeight}" />
+                </StackPanel>
             </ScrollViewer>
 
             <!-- Thước thời gian (dưới) + thanh cuộn ngang -->
