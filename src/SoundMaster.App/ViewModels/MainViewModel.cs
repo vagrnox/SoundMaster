@@ -18,6 +18,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private static readonly string[] AudioExtensions = [".wav", ".mp3", ".aiff", ".aif", ".m4a", ".wma"];
 
     private readonly MixerEngine _engine = new();
+    private readonly TimeStretchProvider _stretch;
     private readonly DispatcherTimer _timer;
     private AudioOutput? _output;
     private readonly bool _enableAudioOutput;
@@ -31,6 +32,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public MainViewModel(bool enableAudioOutput)
     {
         _enableAudioOutput = enableAudioOutput;
+        _stretch = new TimeStretchProvider(_engine);
         Timeline.SeekRequested += OnSeekRequested;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += (_, _) => OnTick();
@@ -49,6 +51,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     public partial bool IsAnalyzing { get; set; }
+
+    /// <summary>Tốc độ phát (0.1x–3x, giữ nguyên cao độ); 1 = bình thường.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SpeedText))]
+    public partial double SpeedFactor { get; set; } = 1;
+
+    public string SpeedText => FormatSpeed(SpeedFactor);
+
+    public static string FormatSpeed(double speed)
+        => Math.Round(speed, 1).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "x";
+
+    partial void OnSpeedFactorChanged(double value) => _stretch.Speed = value;
 
     /// <summary>Thông tin file sẽ xuất bản (placeholder, sau này cho nhập).</summary>
     [ObservableProperty]
@@ -268,6 +282,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             Timeline.PositionSeconds = 0;
             _engine.Seek(0);
+            _stretch.Reset();
             Timeline.ZoomToFit();
         }
         OverviewPeaks = BuildOverview(Tracks.Select(t => t.Strip.Track).ToList());
@@ -319,6 +334,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _engine.Pause();
             IsPlaying = false;
             _engine.Seek(0);
+            _stretch.Reset();
             Timeline.PositionSeconds = 0;
         }
         OverviewPeaks = BuildOverview(Tracks.Select(t => t.Strip.Track).ToList());
@@ -331,7 +347,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (!_enableAudioOutput || _output is not null || Tracks.Count == 0) return;
         try
         {
-            _output = new AudioOutput(_engine);
+            _output = new AudioOutput(_stretch);
             AudioError = "";
         }
         catch (Exception ex)
@@ -357,6 +373,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private void ToStart()
     {
         _engine.Seek(0);
+        _stretch.Reset();
         Timeline.PositionSeconds = 0;
         Timeline.OffsetSeconds = 0;
     }
@@ -374,6 +391,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         double clamped = Math.Clamp(seconds, 0, Timeline.DurationSeconds);
         _engine.Seek(MixerEngine.SecondsToFrames(clamped));
+        _stretch.Reset();
         Timeline.PositionSeconds = clamped;
     }
 

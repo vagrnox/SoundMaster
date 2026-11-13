@@ -162,3 +162,28 @@ public class PanBarTests
         Assert.True(r2 < SoundMaster.App.Controls.PanBar.SideAlphas(1).Right);
     }
 }
+
+public class SpeedBarTests
+{
+    [Fact]
+    public void Center_is_1x_and_range_maps_to_ends()
+    {
+        Assert.Equal(0.5, SoundMaster.App.Controls.SpeedBar.SpeedToFraction(1), 6);
+        Assert.Equal(0.0, SoundMaster.App.Controls.SpeedBar.SpeedToFraction(0.1), 6);
+        Assert.Equal(1.0, SoundMaster.App.Controls.SpeedBar.SpeedToFraction(3), 6);
+        Assert.Equal(1.0, SoundMaster.App.Controls.SpeedBar.FractionToSpeed(0.5), 6);
+        Assert.Equal(0.1, SoundMaster.App.Controls.SpeedBar.FractionToSpeed(0), 6);
+        Assert.Equal(3.0, SoundMaster.App.Controls.SpeedBar.FractionToSpeed(1), 6);
+        // Nửa phải tuyến tính từ 1 đến 3: 0.75 → 2x.
+        Assert.Equal(2.0, SoundMaster.App.Controls.SpeedBar.FractionToSpeed(0.75), 6);
+    }
+
+    [Theory]
+    [InlineData(1.0, "1x")]
+    [InlineData(0.7, "0.7x")]
+    [InlineData(2.1, "2.1x")]
+    [InlineData(3.0, "3x")]
+    [InlineData(0.1, "0.1x")]
+    public void Speed_text_is_compact(double speed, string expected)
+        => Assert.Equal(expected, SoundMaster.App.ViewModels.MainViewModel.FormatSpeed(speed));
+}

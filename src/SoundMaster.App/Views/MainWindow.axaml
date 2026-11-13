@@ -20,6 +20,7 @@
         <KeyBinding Gesture="Ctrl+Space" Command="{Binding PlayPauseCommand}" />
     </Window.KeyBindings>
 
+    <Panel>
     <DockPanel>
 
         <!-- ================= Toolbar trên ================= -->
@@ -231,9 +232,18 @@
                     <!-- Phải: tốc độ (chưa hỗ trợ), export, dòng trạng thái -->
                     <StackPanel Grid.Column="2" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
-                            <Button Classes="pill" IsEnabled="False" ToolTip.Tip="Tốc độ phát (chưa hỗ trợ)">
-                                <TextBlock Text="◷  Speed 1.0x  ⌄" FontSize="12" />
-                            </Button>
+                            <!-- Tốc độ phát: thanh kéo (giữa = 1x) + ô hiện số đang chọn -->
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="◷" FontSize="14" Opacity="0.6" VerticalAlignment="Center"
+                                           ToolTip.Tip="Tốc độ phát (giữ nguyên cao độ)" />
+                                <ctl:SpeedBar Width="130" VerticalAlignment="Center"
+                                              Value="{Binding SpeedFactor, Mode=TwoWay}"
+                                              ToolTip.Tip="Tốc độ phát: kéo trái chậm, kéo phải nhanh (double-click về 1x)" />
+                                <Border Background="#1F1F1F" CornerRadius="10" Padding="8,2" MinWidth="44">
+                                    <TextBlock Text="{Binding SpeedText}" FontFamily="Consolas,monospace" FontSize="13"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </StackPanel>
                             <Button Classes="gold" Padding="16,10" CornerRadius="8" FontWeight="SemiBold"
                                     ToolTip.Tip="Xuất bản mix ra WAV" IsEnabled="{Binding !IsBusy}">
                                 <TextBlock Text="⤓  Export Mix  ⌄" />
@@ -305,7 +315,7 @@
             <ScrollViewer x:Name="HeaderScroll" Grid.Row="1" Grid.Column="0" Background="#141414"
                           VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
-                    <ItemsControl ItemsSource="{Binding Tracks}">
+                    <ItemsControl x:Name="HeaderItems" ItemsSource="{Binding Tracks}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TrackViewModel">
                                 <views:TrackHeaderView />
@@ -351,7 +361,7 @@
             <ScrollViewer x:Name="LaneScroll" Grid.Row="1" Grid.Column="1"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
-                    <ItemsControl ItemsSource="{Binding Tracks}">
+                    <ItemsControl x:Name="LaneItems" ItemsSource="{Binding Tracks}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TrackViewModel">
                                 <Border Height="68" Background="{Binding LaneBackground}" BorderBrush="#06080B" BorderThickness="0,0,0,3">
@@ -390,4 +400,8 @@
                                  PixelsPerSecond="{Binding Timeline.PixelsPerSecond}" />
         </Grid>
     </DockPanel>
+
+    <!-- Lớp phủ cho "ghost" khi kéo đổi thứ tự track -->
+    <Canvas x:Name="DragLayer" IsHitTestVisible="False" />
+    </Panel>
 </Window>

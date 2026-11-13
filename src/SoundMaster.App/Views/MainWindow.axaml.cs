@@ -7,6 +7,11 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
+using Avalonia.Animation;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Media.Transformation;
+using Avalonia.Threading;
 using SoundMaster.App.Controls;
 using SoundMaster.App.ViewModels;
 using SoundMaster.Core.Audio;
@@ -19,6 +24,9 @@ public partial class MainWindow : Window
     private readonly TimelineRuler _barRuler;
     private readonly ScrollViewer _headerScroll;
     private readonly ScrollViewer _laneScroll;
+    private readonly ItemsControl _headerItems;
+    private readonly ItemsControl _laneItems;
+    private readonly Canvas _dragLayer;
     private bool _syncingScroll;
 
     public MainWindow()
@@ -29,6 +37,9 @@ public partial class MainWindow : Window
         _barRuler = this.FindControl<TimelineRuler>("BarRuler")!;
         _headerScroll = this.FindControl<ScrollViewer>("HeaderScroll")!;
         _laneScroll = this.FindControl<ScrollViewer>("LaneScroll")!;
+        _headerItems = this.FindControl<ItemsControl>("HeaderItems")!;
+        _laneItems = this.FindControl<ItemsControl>("LaneItems")!;
+        _dragLayer = this.FindControl<Canvas>("DragLayer")!;
 
         // Chiều rộng vùng lane quyết định số giây nhìn thấy (cho zoom-to-fit và thanh cuộn).
         _barRuler.SizeChanged += (_, e) =>
@@ -48,6 +59,8 @@ public partial class MainWindow : Window
         _headerScroll.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
         _headerScroll.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel);
         _headerScroll.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel);
+        _headerScroll.PointerCaptureLost += OnHeaderCaptureLost;
+        AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
 
         // Kéo file âm thanh thả vào bất kỳ đâu trong vùng làm việc để tạo track mới.
         DragDrop.SetAllowDrop(_workspace, true);
@@ -98,42 +111,228 @@ public partial class MainWindow : Window
     }
 
     // ---------- kéo số thứ tự để đổi thứ tự track ----------
+    //
+    // Bấm vào số thứ tự: hàng đó thành ô trống, một "ghost" (ảnh chụp header) bám theo con trỏ.
+    // Qua nửa hàng khác thì hàng đó trượt lên/xuống nhường chỗ. Thả = chuyển; Esc = hủy, mọi thứ về chỗ cũ.
 
     /// <summary>Phải khớp chiều cao một hàng track (TrackViewModel.RowHeight).</summary>
     private const double TrackRowHeight = TrackViewModel.RowHeight;
+    private const double DragThreshold = 4;
+    private static readonly TimeSpan SlideTime = TimeSpan.FromMilliseconds(140);
 
-    private int _dragIndex = -1;
+    private int _dragFrom = -1;        // chỉ số gốc của track đang kéo
+    private int _dragTarget = -1;      // chỗ sẽ thả
+    private bool _dragActive;          // đã vượt ngưỡng, ghost đang hiện
+    private bool _dragFinishing;       // đang chạy hoạt ảnh kết thúc
+    private double _pressY;            // vị trí bấm (trong viewport), để tính ngưỡng
+    private double _grabOffset;        // con trỏ cách mép trên hàng bao nhiêu
+    private Border? _ghost;
+
+    private Control? HeaderContainer(int i) => _headerItems.ContainerFromIndex(i);
+    private Control? LaneContainer(int i) => _laneItems.ContainerFromIndex(i);
+    private double ContentY(PointerEventArgs e) => e.GetPosition(_headerScroll).Y + _headerScroll.Offset.Y;
 
     private void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Vm is null || !e.GetCurrentPoint(_headerScroll).Properties.IsLeftButtonPressed) return;
+        if (Vm is null || _dragFinishing || !e.GetCurrentPoint(_headerScroll).Properties.IsLeftButtonPressed) return;
         if (e.Source is not Visual src || !IsInGrip(src)) return;
 
-        int index = RowIndexAt(e);
+        int index = (int)Math.Floor(ContentY(e) / TrackRowHeight);
         if (index < 0 || index >= Vm.Tracks.Count || Vm.Tracks[index].IsLocked) return;
 
-        _dragIndex = index;
+        _dragFrom = _dragTarget = index;
+        _dragActive = false;
+        _pressY = e.GetPosition(_headerScroll).Y;
+        _grabOffset = ContentY(e) - index * TrackRowHeight;
         e.Pointer.Capture(_headerScroll);
         e.Handled = true;
     }
 
     private void OnHeaderMoved(object? sender, PointerEventArgs e)
     {
-        if (_dragIndex < 0 || Vm is null) return;
-        int target = Math.Clamp(RowIndexAt(e), 0, Vm.Tracks.Count - 1);
-        // Đổi chỗ ngay khi con trỏ vượt sang hàng khác (sắp xếp trực tiếp).
-        if (target != _dragIndex && Vm.MoveTrack(_dragIndex, target)) _dragIndex = target;
+        if (_dragFrom < 0 || _dragFinishing || Vm is null) return;
+
+        if (!_dragActive)
+        {
+            if (Math.Abs(e.GetPosition(_headerScroll).Y - _pressY) < DragThreshold) return;
+            BeginDrag();
+        }
+
+        int count = Vm.Tracks.Count;
+        double ghostTop = DragGhostTop(ContentY(e), count);
+        PlaceGhost(ghostTop);
+
+        int target = Math.Clamp((int)Math.Round(ghostTop / TrackRowHeight), 0, count - 1);
+        if (target != _dragTarget)
+        {
+            _dragTarget = target;
+            ApplyShifts(_dragFrom, target, count);
+        }
     }
 
     private void OnHeaderReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_dragIndex < 0) return;
-        _dragIndex = -1;
+        if (_dragFrom < 0 || _dragFinishing) return;
         e.Pointer.Capture(null);
+        if (!_dragActive) { ResetDragState(); return; }
+        EndDrag(commit: true);
     }
 
-    private int RowIndexAt(PointerEventArgs e)
-        => (int)Math.Floor((e.GetPosition(_headerScroll).Y + _headerScroll.Offset.Y) / TrackRowHeight);
+    private void OnHeaderCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (_dragFrom >= 0 && !_dragFinishing) EndDrag(commit: false);
+    }
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || _dragFrom < 0 || _dragFinishing) return;
+        e.Handled = true;
+        if (_dragActive) EndDrag(commit: false);
+        else ResetDragState();
+    }
+
+    /// <summary>Vị trí mép trên của ghost (tọa độ nội dung), giới hạn trong danh sách track.</summary>
+    public static double DragGhostTopFor(double contentY, double grabOffset, int count)
+        => Math.Clamp(contentY - grabOffset, 0, Math.Max(0, (count - 1) * TrackRowHeight));
+
+    private double DragGhostTop(double contentY, int count) => DragGhostTopFor(contentY, _grabOffset, count);
+
+    /// <summary>Độ dịch dọc của hàng <paramref name="i"/> khi kéo <paramref name="from"/> tới <paramref name="target"/>.</summary>
+    public static double ShiftFor(int i, int from, int target)
+    {
+        if (i == from) return 0;
+        if (from < target && i > from && i <= target) return -TrackRowHeight;
+        if (from > target && i >= target && i < from) return TrackRowHeight;
+        return 0;
+    }
+
+    private void BeginDrag()
+    {
+        _dragActive = true;
+        var header = HeaderContainer(_dragFrom);
+        if (header is not null) _ghost = BuildGhost(header);
+        if (_ghost is not null) _dragLayer.Children.Add(_ghost);
+        PlaceGhost(_dragFrom * TrackRowHeight);
+
+        // Hàng gốc thành ô trống (cả header lẫn lane); các hàng khác chuẩn bị trượt.
+        if (header is not null) header.Opacity = 0;
+        if (LaneContainer(_dragFrom) is { } lane) lane.Opacity = 0;
+        int count = Vm!.Tracks.Count;
+        for (int i = 0; i < count; i++)
+        {
+            if (i == _dragFrom) continue;
+            EnableSlide(HeaderContainer(i));
+            EnableSlide(LaneContainer(i));
+        }
+    }
+
+    private Border? BuildGhost(Control source)
+    {
+        double w = source.Bounds.Width, h = source.Bounds.Height;
+        if (w < 1 || h < 1) return null;
+        try
+        {
+            double scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+            var bitmap = new RenderTargetBitmap(
+                new PixelSize(Math.Max(1, (int)Math.Ceiling(w * scale)), Math.Max(1, (int)Math.Ceiling(h * scale))),
+                new Vector(96 * scale, 96 * scale));
+            bitmap.Render(source);
+            return new Border
+            {
+                Width = w,
+                Height = h,
+                Opacity = 0.93,
+                BoxShadow = BoxShadows.Parse("0 6 18 0 #AA000000"),
+                Child = new Image { Source = bitmap, Width = w, Height = h, Stretch = Stretch.Fill },
+            };
+        }
+        catch
+        {
+            // Không chụp được thì dùng khối màu thay thế.
+            return new Border { Width = w, Height = h, Background = new SolidColorBrush(Color.Parse("#2A2A2A")), Opacity = 0.9 };
+        }
+    }
+
+    private void PlaceGhost(double contentTop)
+    {
+        if (_ghost is null) return;
+        var p = _headerScroll.TranslatePoint(new Point(0, contentTop - _headerScroll.Offset.Y), _dragLayer) ?? default;
+        Canvas.SetLeft(_ghost, p.X);
+        Canvas.SetTop(_ghost, p.Y);
+    }
+
+    private static void EnableSlide(Control? c)
+    {
+        if (c is null) return;
+        c.Transitions =
+        [
+            new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = SlideTime },
+        ];
+        c.RenderTransform = TransformOperations.Parse("translateY(0px)");
+    }
+
+    private void ApplyShifts(int from, int target, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            if (i == from) continue;
+            var ops = TransformOperations.Parse(
+                $"translateY({ShiftFor(i, from, target).ToString(System.Globalization.CultureInfo.InvariantCulture)}px)");
+            if (HeaderContainer(i) is { } h) h.RenderTransform = ops;
+            if (LaneContainer(i) is { } l) l.RenderTransform = ops;
+        }
+    }
+
+    /// <summary>Kết thúc kéo: ghost trượt về ô đích (thả) hoặc ô gốc (Esc), rồi dọn dẹp.</summary>
+    private void EndDrag(bool commit)
+    {
+        _dragFinishing = true;
+        int from = _dragFrom;
+        int target = commit ? _dragTarget : from;
+
+        if (!commit && Vm is not null) ApplyShifts(from, from, Vm.Tracks.Count); // các hàng về chỗ cũ
+
+        if (_ghost is not null)
+        {
+            _ghost.Transitions = [new DoubleTransition { Property = Canvas.TopProperty, Duration = SlideTime }];
+            PlaceGhost(target * TrackRowHeight);
+        }
+
+        _ = FinishDragAsync(commit, from, target);
+    }
+
+    private async System.Threading.Tasks.Task FinishDragAsync(bool commit, int from, int target)
+    {
+        // Đợi hoạt ảnh trượt xong rồi mới dọn và (nếu thả) đổi chỗ thật.
+        await System.Threading.Tasks.Task.Delay(SlideTime + TimeSpan.FromMilliseconds(30));
+        ClearDragVisuals();
+        if (commit && target != from) Vm?.MoveTrack(from, target);
+        ResetDragState();
+    }
+
+    private void ClearDragVisuals()
+    {
+        if (_ghost is not null) _dragLayer.Children.Remove(_ghost);
+        _ghost = null;
+        int count = Vm?.Tracks.Count ?? 0;
+        for (int i = 0; i < count; i++)
+        {
+            foreach (var c in new[] { HeaderContainer(i), LaneContainer(i) })
+            {
+                if (c is null) continue;
+                c.Transitions = null;
+                c.RenderTransform = null;
+                c.Opacity = 1;
+            }
+        }
+    }
+
+    private void ResetDragState()
+    {
+        _dragFrom = _dragTarget = -1;
+        _dragActive = false;
+        _dragFinishing = false;
+    }
 
     private static bool IsInGrip(Visual v)
     {

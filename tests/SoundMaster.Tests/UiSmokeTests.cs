@@ -120,6 +120,76 @@ public class UiSmokeTests
         Assert.Equal(0, vm.Timeline.DurationSeconds);
         window.Close();
     }
+
+    private static void Pump(int ms)
+    {
+        for (int waited = 0; waited < ms; waited += 20)
+        {
+            Thread.Sleep(20);
+            Dispatcher.UIThread.RunJobs();
+        }
+    }
+
+    private static Point GripCenter(MainWindow window, MainViewModel vm, int trackIndex)
+    {
+        var header = window.GetVisualDescendants().OfType<TrackHeaderView>()
+            .First(h => ReferenceEquals(h.DataContext, vm.Tracks[trackIndex]));
+        var grip = header.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("grip"));
+        return grip.TranslatePoint(new Point(grip.Bounds.Width / 2, grip.Bounds.Height / 2), window)!.Value;
+    }
+
+    [AvaloniaFact]
+    public void DragReorder_DropMovesTrack_AndEscapeCancels()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var original = vm.Tracks.Select(t => t.Name).ToArray();
+
+        // Kéo track 1 xuống qua hai hàng rồi nhấn Esc: thứ tự không đổi.
+        var p = GripCenter(window, vm, 0);
+        window.MouseDown(p, MouseButton.Left);
+        window.MouseMove(new Point(p.X, p.Y + 10));
+        window.MouseMove(new Point(p.X, p.Y + 2 * TrackViewModel.RowHeight + 10));
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        Pump(300);
+        window.MouseUp(new Point(p.X, p.Y + 150), MouseButton.Left);
+        Pump(100);
+        Assert.Equal(original, vm.Tracks.Select(t => t.Name).ToArray());
+
+        // Kéo lần nữa và thả: track đầu xuống vị trí thứ 3.
+        p = GripCenter(window, vm, 0);
+        window.MouseDown(p, MouseButton.Left);
+        window.MouseMove(new Point(p.X, p.Y + 10));
+        window.MouseMove(new Point(p.X, p.Y + 2 * TrackViewModel.RowHeight + 6));
+        Dispatcher.UIThread.RunJobs();
+        window.MouseUp(new Point(p.X, p.Y + 2 * TrackViewModel.RowHeight + 6), MouseButton.Left);
+        Pump(400);
+        Assert.Equal([original[1], original[2], original[0], original[3], original[4]],
+            vm.Tracks.Select(t => t.Name).ToArray());
+        window.Close();
+    }
+
+    [Fact]
+    public void DragMath_ShiftsRowsBetweenSourceAndTarget()
+    {
+        double r = TrackViewModel.RowHeight;
+        // Kéo hàng 1 xuống hàng 3: các hàng 2,3 trượt lên.
+        Assert.Equal(0, MainWindow.ShiftFor(1, 1, 3));
+        Assert.Equal(-r, MainWindow.ShiftFor(2, 1, 3));
+        Assert.Equal(-r, MainWindow.ShiftFor(3, 1, 3));
+        Assert.Equal(0, MainWindow.ShiftFor(4, 1, 3));
+        Assert.Equal(0, MainWindow.ShiftFor(0, 1, 3));
+        // Kéo hàng 3 lên hàng 1: các hàng 1,2 trượt xuống.
+        Assert.Equal(r, MainWindow.ShiftFor(1, 3, 1));
+        Assert.Equal(r, MainWindow.ShiftFor(2, 3, 1));
+        Assert.Equal(0, MainWindow.ShiftFor(3, 3, 1));
+        Assert.Equal(0, MainWindow.ShiftFor(0, 3, 1));
+        // Ghost không ra ngoài danh sách.
+        Assert.Equal(0, MainWindow.DragGhostTopFor(-50, 10, 5));
+        Assert.Equal(4 * r, MainWindow.DragGhostTopFor(9999, 10, 5));
+    }
     [AvaloniaFact]
     public void LockingTrack_DisablesItsControls_OnlyForThatTrack()
     {
