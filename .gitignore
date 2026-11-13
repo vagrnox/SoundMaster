@@ -1,0 +1,17 @@
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.log
+TestResults/
+*.nupkg
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Windows
+Thumbs.db
+Desktop.ini

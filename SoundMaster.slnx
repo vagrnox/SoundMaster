@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SoundMaster.App/SoundMaster.App.csproj" />
+    <Project Path="src/SoundMaster.Core/SoundMaster.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SoundMaster.Tests/SoundMaster.Tests.csproj" />
+  </Folder>
+</Solution>
