@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SoundMaster.App.ViewModels"
+             xmlns:ctl="using:SoundMaster.App.Controls"
+             x:Class="SoundMaster.App.Views.TrackHeaderView"
+             x:DataType="vm:TrackViewModel">
+    <Border Height="104" Background="#141414" BorderBrush="#000000" BorderThickness="0,0,0,2">
+        <Grid ColumnDefinitions="5,*">
+            <!-- Vạch màu của track -->
+            <Border Grid.Column="0" Background="{Binding ColorBrush}" />
+
+            <Grid Grid.Column="1" Margin="8,6,10,6" RowDefinitions="Auto,Auto" VerticalAlignment="Center">
+                <!-- Hàng 1: số thứ tự, tên, đổi màu, mute, solo, arm, khóa -->
+                <Grid Grid.Row="0" ColumnDefinitions="22,*,Auto,Auto,Auto,Auto,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Index}" FontSize="11" Opacity="0.55"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Column="1" Classes="flat" Text="{Binding Name}" FontSize="13"
+                             Padding="4,0" VerticalAlignment="Center" VerticalContentAlignment="Center"
+                             Height="26" MinHeight="26"
+                             IsEnabled="{Binding IsEditable}"
+                             ToolTip.Tip="Bấm để đổi tên" />
+
+                    <Button Grid.Column="2" x:Name="ColorButton" Classes="dot" Margin="4,0,0,0"
+                            Command="{Binding OpenColorPickerCommand}" IsEnabled="{Binding IsEditable}"
+                            ToolTip.Tip="Đổi màu">
+                        <Ellipse Width="14" Height="14" Fill="{Binding ColorBrush}" />
+                    </Button>
+                    <Popup Grid.Column="2" IsOpen="{Binding IsColorPickerOpen, Mode=TwoWay}"
+                           PlacementTarget="{Binding #ColorButton}" Placement="Bottom"
+                           IsLightDismissEnabled="True">
+                        <Border Background="#1E1E1E" BorderBrush="#444444" BorderThickness="1"
+                                CornerRadius="8" Padding="8" Width="176">
+                            <ItemsControl ItemsSource="{Binding Swatches}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ColorSwatch">
+                                        <Button Command="{Binding ApplyCommand}" Width="26" Height="26" Margin="2"
+                                                Padding="0" CornerRadius="13" BorderThickness="0"
+                                                Background="{Binding Brush}" ToolTip.Tip="{Binding Hex}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Popup>
+
+                    <ToggleButton Grid.Column="3" Classes="mini mute" Margin="4,0,0,0"
+                                  IsChecked="{Binding IsMuted}" IsEnabled="{Binding IsEditable}" ToolTip.Tip="Mute">
+                        <PathIcon Width="14" Height="14"
+                                  Data="M3,9 H7 L12,4.5 V19.5 L7,15 H3 Z M14.5,9 Q17,12 14.5,15 L15.7,16.2 Q19.5,12 15.7,7.8 Z" />
+                    </ToggleButton>
+                    <ToggleButton Grid.Column="4" Classes="mini solo" Margin="4,0,0,0" Content="S"
+                                  IsChecked="{Binding IsSolo}" IsEnabled="{Binding IsEditable}" ToolTip.Tip="Solo" />
+                    <ToggleButton Grid.Column="5" Classes="mini arm" Margin="4,0,0,0" Content="A"
+                                  IsChecked="{Binding IsArmed}" IsEnabled="{Binding IsEditable}"
+                                  ToolTip.Tip="Arm (sẵn sàng ghi)" />
+
+                    <!-- Khóa track: bật thì mọi điều khiển còn lại bị vô hiệu -->
+                    <ToggleButton Grid.Column="6" Classes="mini lock" Margin="4,0,0,0"
+                                  IsChecked="{Binding IsLocked}" ToolTip.Tip="Khóa track (không cho chỉnh sửa)">
+                        <PathIcon Width="13" Height="13"
+                                  Data="M7,10 V7 A5,5 0 0 1 17,7 V10 H19 V21 H5 V10 Z M9,10 H15 V7 A3,3 0 0 0 9,7 Z" />
+                    </ToggleButton>
+                </Grid>
+
+                <!-- Hàng 2: volume và pan -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="22,4,0,0">
+                    <!-- Volume: viên thuốc nền đen, vạch xanh = volume, gradient màu track = mức tín hiệu -->
+                    <ctl:VolumeBar Grid.Column="0" VerticalAlignment="Center"
+                                   ValueDb="{Binding GainDb, Mode=TwoWay}"
+                                   LeftDb="{Binding MeterLeftDb}" RightDb="{Binding MeterRightDb}"
+                                   AccentColor="{Binding ColorValue}"
+                                   IsEnabled="{Binding IsEditable}"
+                                   ToolTip.Tip="{Binding GainText}" />
+                    <Slider Grid.Column="1" x:Name="PanSlider" Minimum="-1" Maximum="1" Width="64"
+                            Value="{Binding Pan}" Margin="10,0,0,0" VerticalAlignment="Center"
+                            IsEnabled="{Binding IsEditable}"
+                            DoubleTapped="OnPanDoubleTapped"
+                            ToolTip.Tip="Pan (double-click để về giữa)" />
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

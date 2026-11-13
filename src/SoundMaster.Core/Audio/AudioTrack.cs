@@ -11,14 +11,42 @@ public sealed class AudioTrack
 {
     private const float Int16Scale = 1f / 32768f;
 
+    /// <summary>Số frame gộp vào một phần tử của <see cref="Peaks"/> (~2.9 ms ở 44.1 kHz).</summary>
+    public const int PeakBucketFrames = 128;
+
     public AudioTrack(string name, short[] samples, int frameCount)
     {
         Name = name;
         Samples = samples;
         FrameCount = frameCount;
+        Peaks = ComputePeaks(samples, frameCount);
     }
 
     public string Name { get; }
+
+    /// <summary>Đỉnh tuyệt đối (0..1, max của L/R) cho mỗi <see cref="PeakBucketFrames"/> frame, dùng để vẽ waveform.</summary>
+    public float[] Peaks { get; }
+
+    private static float[] ComputePeaks(short[] samples, int frameCount)
+    {
+        int buckets = (frameCount + PeakBucketFrames - 1) / PeakBucketFrames;
+        var peaks = new float[buckets];
+        for (int b = 0; b < buckets; b++)
+        {
+            int start = b * PeakBucketFrames;
+            int end = Math.Min(frameCount, start + PeakBucketFrames);
+            int max = 0;
+            for (int f = start; f < end; f++)
+            {
+                int l = Math.Abs((int)samples[2 * f]);
+                int r = Math.Abs((int)samples[2 * f + 1]);
+                if (l > max) max = l;
+                if (r > max) max = r;
+            }
+            peaks[b] = Math.Min(1f, max / 32768f);
+        }
+        return peaks;
+    }
     public short[] Samples { get; }
     public int FrameCount { get; }
     public TimeSpan Duration => TimeSpan.FromSeconds((double)FrameCount / EngineFormat.SampleRate);

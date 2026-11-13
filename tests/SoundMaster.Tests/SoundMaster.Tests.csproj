@@ -5,13 +5,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- xunit v3 (cần cho Avalonia.Headless.XUnit) biên dịch project test thành Exe. -->
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.6" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NAudio" Version="3.3.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
@@ -21,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SoundMaster.Core\SoundMaster.Core.csproj" />
+    <ProjectReference Include="..\..\src\SoundMaster.App\SoundMaster.App.csproj" />
   </ItemGroup>
 
 </Project>

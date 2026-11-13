@@ -18,20 +18,38 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly MixerEngine _engine = new();
     private readonly DispatcherTimer _timer;
     private AudioOutput? _output;
-    private bool _updatingFromEngine;
+    private readonly bool _enableAudioOutput;
     private DateTime _lastTick = DateTime.UtcNow;
 
-    public MainViewModel()
+    public MainViewModel() : this(enableAudioOutput: true)
     {
+    }
+
+    /// <param name="enableAudioOutput">false khi chạy test giao diện: không mở thiết bị âm thanh.</param>
+    public MainViewModel(bool enableAudioOutput)
+    {
+        _enableAudioOutput = enableAudioOutput;
+        Timeline.SeekRequested += OnSeekRequested;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += (_, _) => OnTick();
         _timer.Start();
     }
 
-    public ObservableCollection<StripViewModel> Strips { get; } = [];
+    public TimelineViewModel Timeline { get; } = new();
+    public ObservableCollection<TrackViewModel> Tracks { get; } = [];
 
     [ObservableProperty]
-    public partial string Status { get; set; } = "Mở thư mục stems, thêm file, hoặc nạp stem demo để thử.";
+    public partial string SongName { get; set; } = "Untitled";
+
+    [ObservableProperty]
+    public partial string Status { get; set; } = "Dùng nút ••• để mở thư mục stems hoặc nạp stem demo.";
+
+    /// <summary>Lỗi mở thiết bị âm thanh (rỗng nếu không có); chỉ hiện khi có lỗi.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAudioError))]
+    public partial string AudioError { get; set; } = "";
+
+    public bool HasAudioError => AudioError.Length > 0;
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
@@ -41,14 +59,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public partial bool IsPlaying { get; set; }
 
     [ObservableProperty]
-    public partial double PositionSeconds { get; set; }
-
-    [ObservableProperty]
-    public partial double DurationSeconds { get; set; }
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MasterGainText))]
     public partial double MasterGainDb { get; set; }
+
+    /// <summary>Khóa volume tổng (và limiter): không cho chỉnh thêm.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMasterEditable))]
+    public partial bool IsMasterLocked { get; set; }
 
     [ObservableProperty]
     public partial bool LimiterEnabled { get; set; } = true;
@@ -62,25 +79,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     public partial double MasterMeterRightDb { get; set; } = -90;
 
-    [ObservableProperty]
-    public partial double LimiterReductionDb { get; set; }
+    public bool IsMasterEditable => !IsMasterLocked;
+    public string PlayPauseText => IsPlaying ? "⏸" : "▶";
+    public string MasterGainText => MasterGainDb <= MixerEngine.MasterMinDb ? "Volume: -∞ dB" : $"Volume: {MasterGainDb:0.0} dB";
 
-    public string PlayPauseText => IsPlaying ? "⏸ Pause" : "▶ Play";
-    public string MasterGainText => MasterGainDb <= MixerEngine.MasterMinDb ? "-∞ dB" : $"{MasterGainDb:0.0} dB";
-    public string TimeText => $"{FormatTime(PositionSeconds)} / {FormatTime(DurationSeconds)}";
-    public double SeekMaximum => Math.Max(1, DurationSeconds);
-
-    partial void OnPositionSecondsChanged(double value)
+    /// <summary>Tên bài hát đã lọc ký tự không hợp lệ, dùng làm tên file khi xuất.</summary>
+    public string SongFileName
     {
-        OnPropertyChanged(nameof(TimeText));
-        if (!_updatingFromEngine)
-            _engine.Seek(MixerEngine.SecondsToFrames(value));
-    }
-
-    partial void OnDurationSecondsChanged(double value)
-    {
-        OnPropertyChanged(nameof(TimeText));
-        OnPropertyChanged(nameof(SeekMaximum));
+        get
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var cleaned = new string(SongName.Where(c => !invalid.Contains(c)).ToArray()).Trim();
+            return cleaned.Length == 0 ? "Untitled" : cleaned;
+        }
     }
 
     partial void OnMasterGainDbChanged(double value) => _engine.MasterGainDb = (float)value;
@@ -131,8 +142,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             ApplyTracks(loaded, replace);
             Status = errors.Count == 0
-                ? $"Đã nạp {loaded.Count} stem."
-                : $"Đã nạp {loaded.Count} stem, lỗi {errors.Count}: {string.Join("; ", errors)}";
+                ? $"Đã nạp {loaded.Count} track."
+                : $"Đã nạp {loaded.Count} track, lỗi {errors.Count}: {string.Join("; ", errors)}";
         }
         finally
         {
@@ -153,32 +164,43 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (IsBusy) return;
         ApplyTracks([], replace: true);
-        Status = "Đã xóa các stem.";
+        Status = "Đã xóa các track.";
     }
 
     private void ApplyTracks(IReadOnlyList<AudioTrack> tracks, bool replace)
     {
         _engine.Pause();
-        if (replace) Strips.Clear();
+        IsPlaying = false;
+        if (replace) Tracks.Clear();
         foreach (var track in tracks)
-            Strips.Add(new StripViewModel(new ChannelStrip(track)));
+        {
+            int index = Tracks.Count;
+            Tracks.Add(new TrackViewModel(new ChannelStrip(track), Timeline, index + 1, TrackPalette.ForIndex(index)));
+        }
 
-        _engine.SetStrips(Strips.Select(s => s.Strip));
-        DurationSeconds = MixerEngine.FramesToSeconds(_engine.LengthFrames);
-        if (replace) SetPosition(0);
+        _engine.SetStrips(Tracks.Select(t => t.Strip));
+        Timeline.DurationSeconds = MixerEngine.FramesToSeconds(_engine.LengthFrames);
+        if (replace)
+        {
+            Timeline.PositionSeconds = 0;
+            _engine.Seek(0);
+            Timeline.ZoomToFit();
+        }
         EnsureOutput();
     }
 
     private void EnsureOutput()
     {
-        if (_output is not null || Strips.Count == 0) return;
+        if (!_enableAudioOutput || _output is not null || Tracks.Count == 0) return;
         try
         {
             _output = new AudioOutput(_engine);
+            AudioError = "";
         }
         catch (Exception ex)
         {
-            Status = $"Không mở được thiết bị âm thanh: {ex.Message}";
+            // Giữ lỗi ở một ô riêng để không bị thông báo "Đã nạp ..." ghi đè.
+            AudioError = $"Không mở được thiết bị âm thanh: {ex.Message}";
         }
     }
 
@@ -187,25 +209,44 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void PlayPause()
     {
-        if (Strips.Count == 0) return;
+        if (Tracks.Count == 0) return;
         if (_engine.IsPlaying) _engine.Pause();
         else _engine.Play();
         IsPlaying = _engine.IsPlaying;
     }
 
+    /// <summary>Nút "back": về đầu bài, giữ nguyên trạng thái đang phát hay không.</summary>
     [RelayCommand]
-    private void Stop()
+    private void ToStart()
     {
-        _engine.Stop();
-        IsPlaying = false;
-        SetPosition(0);
+        _engine.Seek(0);
+        Timeline.PositionSeconds = 0;
+        Timeline.OffsetSeconds = 0;
     }
+
+    private void OnSeekRequested(double seconds)
+    {
+        double clamped = Math.Clamp(seconds, 0, Timeline.DurationSeconds);
+        _engine.Seek(MixerEngine.SecondsToFrames(clamped));
+        Timeline.PositionSeconds = clamped;
+    }
+
+    // ---------- zoom ----------
+
+    [RelayCommand]
+    private void ZoomIn() => Timeline.ZoomAround(1.25, Timeline.ViewportWidth / 2);
+
+    [RelayCommand]
+    private void ZoomOut() => Timeline.ZoomAround(1 / 1.25, Timeline.ViewportWidth / 2);
+
+    [RelayCommand]
+    private void ZoomFit() => Timeline.ZoomToFit();
 
     // ---------- xuất file ----------
 
     public async Task ExportAsync(string path, ExportFormat format)
     {
-        if (IsBusy || Strips.Count == 0) return;
+        if (IsBusy || Tracks.Count == 0) return;
         IsBusy = true;
         _engine.Pause();
         IsPlaying = false;
@@ -227,35 +268,27 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     // ---------- cập nhật định kỳ ----------
 
-    private void SetPosition(double seconds)
-    {
-        _updatingFromEngine = true;
-        PositionSeconds = seconds;
-        _updatingFromEngine = false;
-    }
-
     private void OnTick()
     {
         var now = DateTime.UtcNow;
         double dt = Math.Min(0.25, (now - _lastTick).TotalSeconds);
         _lastTick = now;
 
-        if (IsPlaying != _engine.IsPlaying && !IsBusy) IsPlaying = _engine.IsPlaying;
-        SetPosition(MixerEngine.FramesToSeconds(_engine.PositionFrames));
+        if (!IsBusy && IsPlaying != _engine.IsPlaying) IsPlaying = _engine.IsPlaying;
 
-        foreach (var strip in Strips)
-            strip.UpdateMeters(dt);
+        double position = MixerEngine.FramesToSeconds(_engine.PositionFrames);
+        Timeline.PositionSeconds = position;
+
+        // Khi playhead chạy quá mép phải của vùng nhìn thì lật "trang".
+        if (IsPlaying && Timeline.ViewportSeconds > 0 && position > Timeline.OffsetSeconds + Timeline.ViewportSeconds)
+            Timeline.OffsetSeconds = position;
+
+        foreach (var track in Tracks)
+            track.UpdateMeters(dt);
 
         var (l, r) = _engine.MasterMeter.ReadAndReset();
         MasterMeterLeftDb = MeterBallistics.Apply(MasterMeterLeftDb, Decibels.FromLinear(l), dt);
         MasterMeterRightDb = MeterBallistics.Apply(MasterMeterRightDb, Decibels.FromLinear(r), dt);
-        LimiterReductionDb = _engine.Limiter.GainReductionDb;
-    }
-
-    private static string FormatTime(double seconds)
-    {
-        var t = TimeSpan.FromSeconds(Math.Max(0, seconds));
-        return $"{(int)t.TotalMinutes}:{t.Seconds:00}.{t.Milliseconds / 100}";
     }
 
     public void Dispose()
