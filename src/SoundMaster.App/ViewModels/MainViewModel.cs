@@ -273,7 +273,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         foreach (var track in tracks)
         {
             int index = Tracks.Count;
-            Tracks.Add(new TrackViewModel(new ChannelStrip(track), Timeline, index + 1, TrackPalette.ForIndex(index)));
+            var created = new TrackViewModel(new ChannelStrip(track), Timeline, index + 1, TrackPalette.ForIndex(index));
+            HookTrack(created);
+            Tracks.Add(created);
         }
 
         _engine.SetStrips(Tracks.Select(t => t.Strip));
@@ -286,8 +288,81 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Timeline.ZoomToFit();
         }
         OverviewPeaks = BuildOverview(Tracks.Select(t => t.Strip.Track).ToList());
+        UpdateLoopRegion(null);
         EnsureOutput();
         StartAnalysis();
+    }
+
+    // ---------- chọn track, vùng chọn, vùng lặp ----------
+
+    private RegionViewModel? _loopOwner;
+
+    /// <summary>Đoạn đang lặp (hiệu ứng Loop), null nếu không có.</summary>
+    public LoopRegion? ActiveLoop => _engine.LoopRegion;
+
+    /// <summary>Track đang chọn (null nếu chưa chọn track nào).</summary>
+    public TrackViewModel? SelectedTrack => Tracks.FirstOrDefault(t => t.IsSelected);
+
+    private void HookTrack(TrackViewModel track)
+    {
+        track.SelectRequested += OnTrackSelectRequested;
+        track.RegionsChanged += t => UpdateLoopRegion(t);
+    }
+
+    private void OnTrackSelectRequested(TrackViewModel track)
+    {
+        foreach (var other in Tracks)
+        {
+            if (ReferenceEquals(other, track)) continue;
+            other.IsSelected = false;
+            other.DeactivateRegion();
+        }
+        track.IsSelected = true;
+    }
+
+    /// <summary>
+    /// Đồng bộ vùng lặp của engine với các vùng có hiệu ứng Loop. Chỉ một vùng lặp tại một thời điểm:
+    /// đặt Loop ở vùng mới thì vùng Loop cũ bị bỏ hiệu ứng.
+    /// </summary>
+    private void UpdateLoopRegion(TrackViewModel? changed)
+    {
+        var loops = Tracks
+            .SelectMany(t => t.Regions.Where(r => r.Effect == RegionEffect.Loop).Select(r => (Track: t, Region: r)))
+            .ToList();
+
+        if (loops.Count > 1)
+        {
+            var keep = loops.LastOrDefault(x => ReferenceEquals(x.Track, changed) && ReferenceEquals(x.Region, x.Track.ActiveRegion));
+            if (keep.Region is null) keep = loops[^1];
+            foreach (var x in loops)
+                if (!ReferenceEquals(x.Region, keep.Region)) x.Region.Effect = RegionEffect.None;
+            loops = [keep];
+        }
+
+        if (loops.Count == 0)
+        {
+            _engine.ClearLoopRegion();
+            _loopOwner = null;
+            return;
+        }
+
+        var region = loops[0].Region;
+        long start = MixerEngine.SecondsToFrames(region.StartSeconds);
+        long end = MixerEngine.SecondsToFrames(region.EndSeconds);
+        _engine.SetLoopRegion(start, end);
+
+        // Vừa đặt vùng lặp mới mà playhead đang ngoài vùng thì nhảy về đầu vùng.
+        if (!ReferenceEquals(_loopOwner, region))
+        {
+            _loopOwner = region;
+            long position = _engine.PositionFrames;
+            if (position < start || position >= end)
+            {
+                _engine.Seek(start);
+                _stretch.Reset();
+                Timeline.PositionSeconds = MixerEngine.FramesToSeconds(start);
+            }
+        }
     }
 
     // ---------- sắp xếp / xóa track ----------
@@ -338,8 +413,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Timeline.PositionSeconds = 0;
         }
         OverviewPeaks = BuildOverview(Tracks.Select(t => t.Strip.Track).ToList());
+        UpdateLoopRegion(null);
         StartAnalysis();
         Status = $"Đã xóa track \"{track.Name}\".";
+    }
+
+    /// <summary>Thiết bị phát đang dùng (tự đổi khi bật/tắt tai nghe Bluetooth hoặc đổi thiết bị mặc định).</summary>
+    [ObservableProperty]
+    public partial string AudioDevice { get; set; } = "";
+
+    private void HandleAudioDeviceChanged(string description, string? error)
+    {
+        // Sự kiện đến từ luồng nền của Windows: chuyển về luồng giao diện.
+        Dispatcher.UIThread.Post(() =>
+        {
+            AudioDevice = description;
+            AudioError = error is null ? "" : $"Không mở được thiết bị âm thanh: {error}";
+        });
     }
 
     private void EnsureOutput()
@@ -348,6 +438,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         try
         {
             _output = new AudioOutput(_stretch);
+            AudioDevice = _output.Description;
+            _output.DeviceChanged += HandleAudioDeviceChanged;
             AudioError = "";
         }
         catch (Exception ex)

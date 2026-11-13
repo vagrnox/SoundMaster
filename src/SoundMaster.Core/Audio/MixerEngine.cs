@@ -35,6 +35,21 @@ public sealed class MixerEngine : ISampleProvider
     public SafetyLimiter Limiter { get; } = new();
     public PeakMeter MasterMeter { get; } = new();
     public bool Loop { get; set; }
+
+    private volatile LoopRegion? _loopRegion;
+
+    /// <summary>Đoạn đang lặp (null = không lặp đoạn). Khác với <see cref="Loop"/> lặp cả bài.</summary>
+    public LoopRegion? LoopRegion => _loopRegion;
+
+    /// <summary>Lặp đoạn [start, end) khi phát tới cuối đoạn thì quay lại đầu đoạn.</summary>
+    public void SetLoopRegion(long startFrame, long endFrame)
+    {
+        startFrame = Math.Max(0, startFrame);
+        endFrame = Math.Min(endFrame, Math.Max(LengthFrames, endFrame));
+        _loopRegion = endFrame > startFrame ? new LoopRegion(startFrame, endFrame) : null;
+    }
+
+    public void ClearLoopRegion() => _loopRegion = null;
     public bool IsPlaying => _playing;
     public long LengthFrames => Interlocked.Read(ref _lengthFrames);
     public long PositionFrames => Interlocked.Read(ref _position);
@@ -93,6 +108,9 @@ public sealed class MixerEngine : ISampleProvider
 
             while (done < frames)
             {
+                var region = _loopRegion;
+                if (region is not null && pos == region.End) pos = region.Start; // hết đoạn lặp: quay về đầu đoạn
+
                 if (pos >= LengthFrames)
                 {
                     if (Loop && LengthFrames > 0)
@@ -107,6 +125,7 @@ public sealed class MixerEngine : ISampleProvider
                 }
 
                 int n = (int)Math.Min(Math.Min(SubBlockFrames, frames - done), LengthFrames - pos);
+                if (region is not null && pos < region.End) n = (int)Math.Min(n, region.End - pos);
                 RenderBlock(buffer.Slice(done * 2, n * 2), n, pos);
                 pos += n;
                 done += n;
@@ -268,3 +287,6 @@ public sealed class MixerEngine : ISampleProvider
         return o;
     }
 }
+
+/// <summary>Đoạn [Start, End) của bài được phát lặp.</summary>
+public sealed record LoopRegion(long Start, long End);

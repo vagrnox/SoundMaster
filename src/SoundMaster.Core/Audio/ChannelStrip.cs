@@ -13,6 +13,7 @@ public sealed class ChannelStrip
     private volatile float _pan;
     private volatile bool _muted;
     private volatile bool _soloed;
+    private volatile ClipEffect[] _effects = [];
 
     // Trạng thái chỉ audio thread chạm vào.
     private float _currentLeft;
@@ -53,6 +54,11 @@ public sealed class ChannelStrip
         set => _soloed = value;
     }
 
+    /// <summary>Thay toàn bộ hiệu ứng theo đoạn của track (an toàn khi đang phát).</summary>
+    public void SetEffects(IEnumerable<ClipEffect> effects) => _effects = effects.ToArray();
+
+    public IReadOnlyList<ClipEffect> Effects => _effects;
+
     internal void ResetState() => _initialized = false;
 
     /// <summary>Cộng <paramref name="frames"/> frame của stem (từ startFrame) vào bộ đệm mix.</summary>
@@ -73,6 +79,7 @@ public sealed class ChannelStrip
         float stepL = (targetL - _currentLeft) / frames;
         float stepR = (targetR - _currentRight) / frames;
 
+        var effects = _effects;
         long available = Math.Clamp(Track.FrameCount - startFrame, 0, frames);
         float peakL = 0f, peakR = 0f;
 
@@ -84,7 +91,21 @@ public sealed class ChannelStrip
             float l = 0f, r = 0f;
             if (i < available)
             {
-                (l, r) = Track.GetFrame(startFrame + i);
+                long pos = startFrame + i;
+                if (effects.Length == 0)
+                {
+                    (l, r) = Track.GetFrame(pos);
+                }
+                else
+                {
+                    var (source, clipGain) = ClipEffect.Resolve(effects, pos);
+                    if (source >= 0 && source < Track.FrameCount)
+                    {
+                        (l, r) = Track.GetFrame(source);
+                        l *= clipGain;
+                        r *= clipGain;
+                    }
+                }
                 l *= _currentLeft;
                 r *= _currentRight;
             }

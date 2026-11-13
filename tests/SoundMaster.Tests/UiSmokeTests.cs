@@ -79,6 +79,13 @@ public class UiSmokeTests
             vm.Tracks[i].MeterLeftDb = meters[i];
             vm.Tracks[i].MeterRightDb = meters[i] - 2;
         }
+        // Vùng chọn mẫu: Fade in trên track 1, Loop trên track 4, và vùng đang chọn (chưa có hiệu ứng) trên track 3.
+        var fadeRegion = vm.Tracks[0].BeginRegion(2.0, 6.0);
+        vm.Tracks[0].SetEffect(fadeRegion, RegionEffect.FadeIn);
+        var loopRegion = vm.Tracks[3].BeginRegion(8.0, 12.0);
+        vm.Tracks[3].SetEffect(loopRegion, RegionEffect.Loop);
+        vm.Tracks[2].RequestSelect();
+        vm.Tracks[2].BeginRegion(3.0, 9.0);
         vm.MasterMeterLeftDb = -5;
         vm.MasterMeterRightDb = -7;
         Dispatcher.UIThread.RunJobs();
@@ -189,6 +196,121 @@ public class UiSmokeTests
         // Ghost không ra ngoài danh sách.
         Assert.Equal(0, MainWindow.DragGhostTopFor(-50, 10, 5));
         Assert.Equal(4 * r, MainWindow.DragGhostTopFor(9999, 10, 5));
+    }
+
+    private static WaveformView LaneOf(MainWindow window, TrackViewModel track)
+        => window.GetVisualDescendants().OfType<WaveformView>().First(l => ReferenceEquals(l.DataContext, track));
+
+    [AvaloniaFact]
+    public void Lane_Click_SelectsTrack_WithoutSeeking_AndDragCreatesResizableRegion()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var track = vm.Tracks[2];
+        var lane = LaneOf(window, track);
+        Point At(double x) => lane.TranslatePoint(new Point(x, 30), window)!.Value;
+        double positionBefore = vm.Timeline.PositionSeconds;
+
+        // Bấm: chọn track, không tua.
+        window.MouseDown(At(100), MouseButton.Left);
+        window.MouseUp(At(100), MouseButton.Left);
+        Assert.True(track.IsSelected);
+        Assert.All(vm.Tracks.Where(t => !ReferenceEquals(t, track)), t => Assert.False(t.IsSelected));
+        Assert.Equal(positionBefore, vm.Timeline.PositionSeconds);
+        Assert.Empty(track.Regions);
+
+        // Kéo: tạo vùng, vùng trở thành vùng đang chọn.
+        window.MouseDown(At(100), MouseButton.Left);
+        window.MouseMove(At(120));
+        window.MouseMove(At(300));
+        window.MouseUp(At(300), MouseButton.Left);
+        var region = Assert.Single(track.Regions);
+        Assert.Same(region, track.ActiveRegion);
+        double pps = vm.Timeline.PixelsPerSecond;
+        Assert.Equal(200 / pps, region.LengthSeconds, 2);
+        Assert.Equal(positionBefore, vm.Timeline.PositionSeconds);
+
+        // Kéo cạnh phải ra thêm 60 px: vùng dài thêm 60/pps giây.
+        double endX = (region.EndSeconds - vm.Timeline.OffsetSeconds) * pps;
+        double endBefore = region.EndSeconds;
+        window.MouseDown(At(endX), MouseButton.Left);
+        window.MouseMove(At(endX + 30));
+        window.MouseMove(At(endX + 60));
+        window.MouseUp(At(endX + 60), MouseButton.Left);
+        Assert.Equal(endBefore + 60 / pps, region.EndSeconds, 2);
+        Assert.Single(track.Regions);
+
+        // Bấm ra ngoài vùng (không kéo): vùng trống bị bỏ.
+        window.MouseDown(At(900), MouseButton.Left);
+        window.MouseUp(At(900), MouseButton.Left);
+        Assert.Empty(track.Regions);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Lane_RightClickOnRegion_OffersEffectsMenu()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var track = vm.Tracks[0];
+        var lane = LaneOf(window, track);
+        Point At(double x) => lane.TranslatePoint(new Point(x, 30), window)!.Value;
+
+        window.MouseDown(At(100), MouseButton.Left);
+        window.MouseMove(At(150));
+        window.MouseMove(At(400));
+        window.MouseUp(At(400), MouseButton.Left);
+        Assert.Single(track.Regions);
+
+        window.MouseDown(At(250), MouseButton.Right);
+        window.MouseUp(At(250), MouseButton.Right);
+        Assert.NotNull(lane.ContextMenu);
+        var headers = lane.ContextMenu!.Items.OfType<MenuItem>().Select(i => i.Header?.ToString()).ToArray();
+        Assert.Equal(["Fade in", "Fade out", "Loop", "Silence", "Reverse", "Bỏ hiệu ứng", "Xóa vùng chọn"], headers);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void RegionEffects_DriveEngine_LoopIsExclusive_AndLockBlocksEdits()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var a = vm.Tracks[0];
+        var b = vm.Tracks[1];
+        var ra = a.BeginRegion(1, 3);
+        var rb = b.BeginRegion(5, 7);
+
+        a.SetEffect(ra, RegionEffect.FadeIn);
+        Assert.Equal("Fade in", ra.BadgeText);
+        Assert.Equal(ClipEffectKind.FadeIn, Assert.Single(a.Strip.Effects).Kind);
+        Assert.Null(vm.ActiveLoop);
+
+        a.SetEffect(ra, RegionEffect.Loop);
+        Assert.Empty(a.Strip.Effects);                 // Loop không phải hiệu ứng trên stem
+        Assert.Equal(new LoopRegion(44100, 3 * 44100), vm.ActiveLoop);
+        Assert.Equal(1.0, vm.Timeline.PositionSeconds, 2); // playhead nhảy về đầu đoạn lặp
+
+        // Đặt Loop ở vùng khác: vùng Loop cũ bị bỏ hiệu ứng.
+        b.SetEffect(rb, RegionEffect.Loop);
+        Assert.Equal(RegionEffect.None, ra.Effect);
+        Assert.Equal(new LoopRegion(5 * 44100, 7 * 44100), vm.ActiveLoop);
+
+        // Bỏ hiệu ứng: hết lặp.
+        b.SetEffect(rb, RegionEffect.None);
+        Assert.Null(vm.ActiveLoop);
+
+        // Track khóa: không đổi hiệu ứng được.
+        a.IsLocked = true;
+        a.SetEffect(ra, RegionEffect.Reverse);
+        Assert.Equal(RegionEffect.None, ra.Effect);
+        Assert.Empty(a.Strip.Effects);
+        window.Close();
     }
     [AvaloniaFact]
     public void LockingTrack_DisablesItsControls_OnlyForThatTrack()

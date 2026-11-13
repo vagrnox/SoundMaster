@@ -370,8 +370,7 @@
                                                       Title="{Binding Name}"
                                                       PixelsPerSecond="{Binding Timeline.PixelsPerSecond}"
                                                       OffsetSeconds="{Binding Timeline.OffsetSeconds}"
-                                                      Bpm="{Binding Timeline.Bpm}"
-                                                      SeekCommand="{Binding Timeline.SeekCommand}" />
+                                                      Bpm="{Binding Timeline.Bpm}" />
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

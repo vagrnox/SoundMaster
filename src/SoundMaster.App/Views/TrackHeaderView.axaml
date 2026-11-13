@@ -4,7 +4,8 @@
              xmlns:ctl="using:SoundMaster.App.Controls"
              x:Class="SoundMaster.App.Views.TrackHeaderView"
              x:DataType="vm:TrackViewModel">
-    <Border Height="68" Background="#141414" BorderBrush="#000000" BorderThickness="0,0,0,3">
+    <Border Height="68" Background="{Binding HeaderBackground}" BorderBrush="#000000" BorderThickness="0,0,0,3"
+            PointerPressed="OnHeaderPressed">
         <Border.ContextMenu>
             <ContextMenu>
                 <MenuItem Header="Chuyển lên" Click="OnMoveUp" IsEnabled="{Binding IsEditable}" />
