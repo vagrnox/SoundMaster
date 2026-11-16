@@ -11,7 +11,7 @@ public static class MidiExporter
     public static long SecondsToTicks(double seconds, double bpm)
         => (long)Math.Round(seconds * bpm / 60.0 * TicksPerQuarter);
 
-    public static void Export(string path, IReadOnlyList<TranscribedNote> notes, double bpm, string trackName = "SoundMaster")
+    public static void Export(string path, IReadOnlyList<TranscribedNote> notes, double bpm, string trackName = "SoundMaster", string? lyrics = null)
     {
         bpm = Math.Clamp(bpm, 20, 400);
 
@@ -30,6 +30,26 @@ public static class MidiExporter
             long end = Math.Max(start + 1, SecondsToTicks(note.EndSeconds, bpm));
             events.AddEvent(new NoteOnEvent(start, 1, note.MidiNote, note.Velocity, (int)(end - start)), 1);
             events.AddEvent(new NoteEvent(end, 1, MidiCommandCode.NoteOff, note.MidiNote, 0), 1);
+        }
+
+        // Lời hát: mỗi âm tiết là một sự kiện Lyric ở đầu nốt tương ứng (các nốt cùng lúc dùng chung một âm tiết).
+        var syllables = Notation.Lyrics.Parse(lyrics);
+        if (syllables.Count > 0)
+        {
+            double lastStart = double.NegativeInfinity;
+            int slot = -1;
+            foreach (var note in notes.OrderBy(n => n.StartSeconds))
+            {
+                if (note.StartSeconds - lastStart > 0.03) slot++;
+                lastStart = note.StartSeconds;
+                if (slot >= syllables.Count) break;
+                if (syllables[slot] is { } s && note.StartSeconds - lastStart <= 0.03)
+                {
+                    long tick = SecondsToTicks(note.StartSeconds, bpm);
+                    if (!events[1].OfType<TextEvent>().Any(t => t.MetaEventType == MetaEventType.Lyric && t.AbsoluteTime == tick))
+                        events.AddEvent(new TextEvent(s.Display, MetaEventType.Lyric, tick), 1);
+                }
+            }
         }
 
         events.PrepareForExport();

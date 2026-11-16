@@ -81,6 +81,7 @@ public partial class MainViewModel
                 Armed = t.IsArmed,
                 Locked = t.IsLocked,
                 Midi = t.IsMidi,
+                Lyrics = t.Lyrics.Length == 0 ? null : t.Lyrics,
                 Notes = t.Notes.Count == 0 ? null : t.Notes.Select(n => new ProjectNote { Start = n.StartSeconds, End = n.EndSeconds, Note = n.MidiNote, Velocity = n.Velocity, Confidence = n.Confidence }).ToList(),
                 Regions = t.Regions
                     .Select(r => new ProjectRegion { Start = r.StartSeconds, End = r.EndSeconds, Effect = r.Effect.ToString(), LoopPlays = r.LoopPlays })
@@ -103,6 +104,7 @@ public partial class MainViewModel
         track.IsSolo = saved.Soloed;
         track.IsArmed = saved.Armed;
         track.IsMidi = saved.Midi;
+        track.Lyrics = saved.Lyrics ?? "";
         track.Notes = saved.Notes is null ? [] : saved.Notes.Select(n => new TranscribedNote(n.Start, n.End, n.Note, n.Velocity, n.Confidence)).ToList();
 
         track.Regions.Clear();

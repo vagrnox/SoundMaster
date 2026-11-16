@@ -297,7 +297,8 @@
 
         <!-- ================= Vùng làm việc ================= -->
         <Panel>
-        <views:PianoRollView IsVisible="{Binding IsPianoRoll}" ZIndex="10" />
+        <views:PianoRollView IsVisible="{Binding IsRollVisible}" ZIndex="10" />
+        <views:SheetView IsVisible="{Binding IsSheet}" ZIndex="11" />
         <Grid x:Name="Workspace" ColumnDefinitions="300,*" RowDefinitions="44,*,26,14" IsVisible="{Binding !IsPianoRoll}">
 
             <!-- Ô đầu sidebar: volume tổng + limiter + khóa -->

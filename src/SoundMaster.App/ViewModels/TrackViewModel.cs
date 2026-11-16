@@ -156,6 +156,10 @@ public partial class TrackViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsMidi { get; set; }
 
+    /// <summary>Lời bài hát của track (âm tiết cách nhau bằng dấu cách, "-" tách âm tiết trong từ, "_" bỏ qua một nốt).</summary>
+    [ObservableProperty]
+    public partial string Lyrics { get; set; } = "";
+
     // ---------- vùng chọn & hiệu ứng ----------
 
     /// <summary>Các vùng chọn trên track (vùng có hiệu ứng được giữ lại cùng nhãn).</summary>

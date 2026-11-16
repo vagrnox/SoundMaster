@@ -47,6 +47,9 @@ public sealed class ProjectTrack
     /// <summary>Track MIDI (không có audio: chỉ có nốt).</summary>
     public bool Midi { get; set; }
 
+    /// <summary>Lời bài hát gắn với các nốt (null nếu chưa nhập).</summary>
+    public string? Lyrics { get; set; }
+
     /// <summary>Các nốt đã bóc / nhập từ MIDI (null nếu chưa có).</summary>
     public List<ProjectNote>? Notes { get; set; }
 }

@@ -26,6 +26,11 @@ public partial class TrackHeaderView : UserControl
         if (Main is { } main && Track is { } track) await main.OpenPianoRollAsync(track);
     }
 
+    private async void OnOpenSheet(object? sender, RoutedEventArgs e)
+    {
+        if (Main is { } main && Track is { } track) await main.OpenSheetAsync(track);
+    }
+
     private async void OnTranscribe(object? sender, RoutedEventArgs e)
     {
         if (Main is { } main && Track is { } track) await main.TranscribeTrackAsync(track);

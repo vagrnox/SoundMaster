@@ -213,11 +213,11 @@ public partial class MainWindow : Window
 
         if (Vm is { IsPianoRoll: true } roll && FocusManager?.GetFocusedElement() is not TextBox)
         {
-            if (e.Key == Key.Escape) { roll.ClosePianoRollCommand.Execute(null); e.Handled = true; return; }
-            if (e.Key == Key.Delete) { roll.DeleteSelectedNote(); e.Handled = true; return; }
-            if (e.KeyModifiers == KeyModifiers.None && e.Key == Key.S) { roll.SplitNoteCommand.Execute(null); e.Handled = true; return; }
-            if (e.KeyModifiers == KeyModifiers.None && e.Key == Key.M) { roll.MergeNoteCommand.Execute(null); e.Handled = true; return; }
-            if (e.KeyModifiers == KeyModifiers.None && e.Key == Key.Q) { roll.QuantizeNotesCommand.Execute(null); e.Handled = true; return; }
+            if (e.Key == Key.Escape) { (roll.IsSheet ? roll.CloseSheetCommand : roll.ClosePianoRollCommand).Execute(null); e.Handled = true; return; }
+            if (!roll.IsSheet && e.Key == Key.Delete) { roll.DeleteSelectedNote(); e.Handled = true; return; }
+            if (!roll.IsSheet && e.KeyModifiers == KeyModifiers.None && e.Key == Key.S) { roll.SplitNoteCommand.Execute(null); e.Handled = true; return; }
+            if (!roll.IsSheet && e.KeyModifiers == KeyModifiers.None && e.Key == Key.M) { roll.MergeNoteCommand.Execute(null); e.Handled = true; return; }
+            if (!roll.IsSheet && e.KeyModifiers == KeyModifiers.None && e.Key == Key.Q) { roll.QuantizeNotesCommand.Execute(null); e.Handled = true; return; }
         }
 
         if (e.Key != Key.Escape || _dragFrom < 0 || _dragFinishing) return;

@@ -30,7 +30,11 @@
                         Command="{Binding ClosePianoRollCommand}" ToolTip.Tip="Về mixer (Esc)">
                     <TextBlock Text="←  Mixer" FontSize="12" />
                 </Button>
-                <TextBlock Grid.Column="1" Text="Piano roll" FontSize="13" FontWeight="SemiBold" Opacity="0.8"
+                <Button Grid.Column="1" Classes="gold" Padding="12,5" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Command="{Binding ShowSheetCommand}" ToolTip.Tip="Xem thành bản nhạc, nhập lời, xuất MusicXML">
+                    <TextBlock Text="Bản nhạc ♪" FontSize="12" />
+                </Button>
+                <TextBlock Grid.Column="1" IsVisible="False" Text="Piano roll" FontSize="13" FontWeight="SemiBold" Opacity="0.8"
                            HorizontalAlignment="Right" VerticalAlignment="Center" />
             </Grid>
         </Border>

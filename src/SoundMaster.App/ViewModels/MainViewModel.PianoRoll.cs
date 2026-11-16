@@ -59,14 +59,21 @@ public partial class MainViewModel
     /// <summary>Bước bám lưới khi kéo (0 = tắt).</summary>
     public double RollSnapSeconds => SnapToGrid ? GridSeconds : 0;
 
-    partial void OnIsPianoRollChanged(bool value) => RefreshNotePlayback();
+    partial void OnIsPianoRollChanged(bool value)
+    {
+        RefreshNotePlayback();
+        OnPropertyChanged(nameof(IsRollVisible));
+    }
 
     partial void OnRollListenStemsChanged(bool value) => RefreshNotePlayback();
 
     private void OnTimelineChangedForRoll(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TimelineViewModel.Bpm))
+        {
             OnPropertyChanged(nameof(RollSnapSeconds));
+            RebuildScore();
+        }
     }
 
     /// <summary>
@@ -103,6 +110,7 @@ public partial class MainViewModel
     private void ClosePianoRoll()
     {
         PreviewNoteOff();
+        IsSheet = false;
         IsPianoRoll = false;
     }
 

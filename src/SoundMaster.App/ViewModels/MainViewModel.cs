@@ -330,6 +330,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         track.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(TrackViewModel.Notes)) RefreshNotePlayback();
+            if (e.PropertyName is nameof(TrackViewModel.Notes) or nameof(TrackViewModel.Lyrics) && ReferenceEquals(SelectedTrack, track)) RebuildScore();
         };
     }
 
@@ -343,6 +344,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
         track.IsSelected = true;
         OnPropertyChanged(nameof(SelectedTrack));
+        RebuildScore();
         RefreshNotePlayback();
         SelectedNote = null;
 
@@ -427,7 +429,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            MidiExporter.Export(path, track.Notes, Timeline.Bpm, track.Name);
+            MidiExporter.Export(path, track.Notes, Timeline.Bpm, track.Name, track.Lyrics);
             Status = $"Đã xuất {track.Notes.Count} nốt ra {Path.GetFileName(path)} ({Timeline.BpmText} BPM).";
         }
         catch (Exception ex)
