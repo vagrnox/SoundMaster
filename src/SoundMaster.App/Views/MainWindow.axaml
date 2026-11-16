@@ -9,7 +9,7 @@
         x:Class="SoundMaster.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="SoundMaster"
+        Title="{Binding WindowTitle}"
         Width="1400" Height="800" MinWidth="900" MinHeight="520">
 
     <Design.DataContext>
@@ -44,6 +44,11 @@
                     <Button Grid.Column="2" Classes="pill" Content="•••" Margin="12,0,0,0" ToolTip.Tip="Mở / nạp stem">
                         <Button.Flyout>
                             <MenuFlyout>
+                                <MenuItem Header="🆕  Project mới" Click="OnNewProject" />
+                                <MenuItem Header="📁  Mở project…  (Ctrl+O)" Click="OnOpenProject" />
+                                <MenuItem Header="💾  Lưu project  (Ctrl+S)" Click="OnSaveProject" />
+                                <MenuItem Header="💾  Lưu project thành…  (Ctrl+Shift+S)" Click="OnSaveProjectAs" />
+                                <Separator />
                                 <MenuItem Header="📂  Mở thư mục stems…" Click="OnOpenFolder" />
                                 <MenuItem Header="➕  Thêm file âm thanh…" Click="OnAddFiles" />
                                 <MenuItem Header="🎹  Nạp stem demo" Click="OnLoadDemo" />
@@ -57,10 +62,10 @@
                 <!-- Undo/redo, thời gian -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
                     <StackPanel Orientation="Horizontal" Spacing="2">
-                        <Button Classes="pill" Content="↶" IsEnabled="False" Padding="14,8,10,8"
-                                ToolTip.Tip="Undo (chưa hỗ trợ)" />
-                        <Button Classes="pill" Content="↷" IsEnabled="False" Padding="10,8,14,8"
-                                ToolTip.Tip="Redo (chưa hỗ trợ)" />
+                        <Button Classes="pill" Content="↶" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}"
+                                Padding="14,8,10,8" ToolTip.Tip="Hoàn tác (Ctrl+Z)" />
+                        <Button Classes="pill" Content="↷" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}"
+                                Padding="10,8,14,8" ToolTip.Tip="Làm lại (Ctrl+Y)" />
                     </StackPanel>
 
 
@@ -100,7 +105,15 @@
                                  FontFamily="Consolas,monospace" FontSize="20" FontWeight="SemiBold"
                                  Padding="0" Height="28" MinHeight="28" Width="90" HorizontalAlignment="Left"
                                  VerticalContentAlignment="Center" ToolTip.Tip="BPM (30–300)" />
-                        <TextBlock Classes="statSub" Text="Tempo" />
+                        <!-- Dò BPM từ audio; ½ / ×2 để sửa khi bị nhầm nhịp -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,1,0,0">
+                            <Button Classes="tiny" Content="Dò" Command="{Binding DetectBpmCommand}"
+                                    ToolTip.Tip="Tự điền BPM dò được từ audio" />
+                            <Button Classes="tiny" Content="½" Command="{Binding HalveBpmCommand}"
+                                    ToolTip.Tip="Chia đôi BPM (khi dò nhầm gấp đôi)" />
+                            <Button Classes="tiny" Content="×2" Command="{Binding DoubleBpmCommand}"
+                                    ToolTip.Tip="Nhân đôi BPM (khi dò nhầm một nửa)" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
                 <!-- Nhịp -->

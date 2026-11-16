@@ -41,15 +41,28 @@ public sealed class MixerEngine : ISampleProvider
     /// <summary>Đoạn đang lặp (null = không lặp đoạn). Khác với <see cref="Loop"/> lặp cả bài.</summary>
     public LoopRegion? LoopRegion => _loopRegion;
 
-    /// <summary>Lặp đoạn [start, end) khi phát tới cuối đoạn thì quay lại đầu đoạn.</summary>
-    public void SetLoopRegion(long startFrame, long endFrame)
+    private int _loopPassesLeft;
+
+    /// <summary>
+    /// Lặp đoạn [start, end): tới cuối đoạn thì quay lại đầu đoạn cho đủ <paramref name="plays"/> lần nghe
+    /// (tổng số lần phát đoạn), rồi phát tiếp. <paramref name="plays"/> ≤ 0 nghĩa là lặp mãi cho tới khi gỡ.
+    /// Tua lại (Seek) vào đoạn thì đếm lại từ đầu.
+    /// </summary>
+    public void SetLoopRegion(long startFrame, long endFrame, int plays = 0)
     {
         startFrame = Math.Max(0, startFrame);
         endFrame = Math.Min(endFrame, Math.Max(LengthFrames, endFrame));
-        _loopRegion = endFrame > startFrame ? new LoopRegion(startFrame, endFrame) : null;
+        _loopRegion = endFrame > startFrame ? new LoopRegion(startFrame, endFrame, Math.Max(0, plays)) : null;
+        ResetLoopPasses();
     }
 
     public void ClearLoopRegion() => _loopRegion = null;
+
+    private void ResetLoopPasses()
+    {
+        var region = _loopRegion;
+        Volatile.Write(ref _loopPassesLeft, region is null || region.Plays <= 0 ? 0 : region.Plays - 1);
+    }
     public bool IsPlaying => _playing;
     public long LengthFrames => Interlocked.Read(ref _lengthFrames);
     public long PositionFrames => Interlocked.Read(ref _position);
@@ -87,7 +100,10 @@ public sealed class MixerEngine : ISampleProvider
     }
 
     public void Seek(long frame)
-        => Interlocked.Exchange(ref _position, Math.Clamp(frame, 0, LengthFrames));
+    {
+        Interlocked.Exchange(ref _position, Math.Clamp(frame, 0, LengthFrames));
+        ResetLoopPasses();
+    }
 
     public int Read(float[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
@@ -109,13 +125,26 @@ public sealed class MixerEngine : ISampleProvider
             while (done < frames)
             {
                 var region = _loopRegion;
-                if (region is not null && pos == region.End) pos = region.Start; // hết đoạn lặp: quay về đầu đoạn
+                if (region is not null && pos == region.End)
+                {
+                    // Hết đoạn lặp: quay về đầu đoạn cho đủ số lần nghe, sau đó phát tiếp.
+                    if (region.Plays <= 0)
+                    {
+                        pos = region.Start;
+                    }
+                    else if (Volatile.Read(ref _loopPassesLeft) > 0)
+                    {
+                        Interlocked.Decrement(ref _loopPassesLeft);
+                        pos = region.Start;
+                    }
+                }
 
                 if (pos >= LengthFrames)
                 {
                     if (Loop && LengthFrames > 0)
                     {
                         pos = 0;
+                        ResetLoopPasses();
                     }
                     else
                     {
@@ -288,5 +317,5 @@ public sealed class MixerEngine : ISampleProvider
     }
 }
 
-/// <summary>Đoạn [Start, End) của bài được phát lặp.</summary>
-public sealed record LoopRegion(long Start, long End);
+/// <summary>Đoạn [Start, End) của bài được phát lặp; <c>Plays</c> = tổng số lần phát (0 = mãi mãi).</summary>
+public sealed record LoopRegion(long Start, long End, int Plays = 0);

@@ -384,7 +384,7 @@ public class WaveformView : Control
         var menu = new ContextMenu();
         menu.Items.Add(Effect("Fade in", RegionEffect.FadeIn));
         menu.Items.Add(Effect("Fade out", RegionEffect.FadeOut));
-        menu.Items.Add(Effect("Loop", RegionEffect.Loop));
+        menu.Items.Add(BuildLoopItem(vm, region));
         menu.Items.Add(Effect("Silence", RegionEffect.Silence));
         menu.Items.Add(Effect("Reverse", RegionEffect.Reverse));
         menu.Items.Add(new Separator());
@@ -394,6 +394,22 @@ public class WaveformView : Control
         menu.Items.Add(clear);
         menu.Items.Add(ToItem("Xóa vùng chọn", false, () => vm.RemoveRegion(region)));
         return menu;
+    }
+
+    private static readonly (string Label, int Plays)[] LoopChoices =
+    [
+        ("Lặp 2 lần", 2), ("Lặp 3 lần", 3), ("Lặp 4 lần", 4), ("Lặp 8 lần", 8), ("Lặp mãi (∞)", 0),
+    ];
+
+    /// <summary>Mục "Loop" có menu con chọn số lần nghe đoạn; hết số lần thì phát tiếp (trừ "mãi").</summary>
+    private static MenuItem BuildLoopItem(TrackViewModel vm, RegionViewModel region)
+    {
+        bool isLoop = region.Effect == RegionEffect.Loop;
+        var loop = new MenuItem { Header = "Loop" };
+        if (isLoop) loop.Icon = new TextBlock { Text = "✓", Foreground = PrimaryBrush };
+        foreach (var (label, plays) in LoopChoices)
+            loop.Items.Add(ToItem(label, isLoop && region.LoopPlays == plays, () => vm.SetLoop(region, plays)));
+        return loop;
     }
 
     private static MenuItem ToItem(string header, bool isChecked, Action action)

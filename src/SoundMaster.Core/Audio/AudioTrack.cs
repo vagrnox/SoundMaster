@@ -24,6 +24,12 @@ public sealed class AudioTrack
 
     public string Name { get; }
 
+    /// <summary>Đường dẫn file gốc (đầy đủ) nếu stem được giải mã từ file; dùng để lưu project.</summary>
+    public string? SourcePath { get; set; }
+
+    /// <summary>Khóa của stem tổng hợp (demo); null nếu stem đến từ file.</summary>
+    public string? DemoKey { get; set; }
+
     /// <summary>Đỉnh tuyệt đối (0..1, max của L/R) cho mỗi <see cref="PeakBucketFrames"/> frame, dùng để vẽ waveform.</summary>
     public float[] Peaks { get; }
 
@@ -94,7 +100,10 @@ public sealed class AudioTrack
             written += read;
         }
 
-        return new AudioTrack(Path.GetFileNameWithoutExtension(path), samples, written / 2);
+        return new AudioTrack(Path.GetFileNameWithoutExtension(path), samples, written / 2)
+        {
+            SourcePath = Path.GetFullPath(path),
+        };
     }
 
     public (float Left, float Right) GetFrame(long frame)

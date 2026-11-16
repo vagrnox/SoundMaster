@@ -98,6 +98,38 @@ public class ClipEffectTests
     }
 
     [Fact]
+    public void Loop_with_a_play_count_repeats_then_continues_past_the_region()
+    {
+        var (engine, _, _) = Setup(8000);
+        engine.SetLoopRegion(1000, 1500, plays: 3); // nghe đoạn 3 lần rồi phát tiếp
+        Render(engine, 5000);
+        // 5000 frame đầu ra, trong đó 2 lượt lặp thêm (2 × 500) không tiến vị trí: 5000 - 1000 = 4000.
+        Assert.Equal(4000, engine.PositionFrames);
+
+        // Tua lại vào đoạn thì đếm lại từ đầu: lại 2 lượt lặp thêm.
+        engine.Seek(1000);
+        Render(engine, 2600);
+        Assert.Equal(1000 + 2600 - 1000, engine.PositionFrames);
+
+        // Chỉ nghe 1 lần = không lặp.
+        engine.SetLoopRegion(1000, 1500, plays: 1);
+        engine.Seek(1000);
+        Render(engine, 1000);
+        Assert.Equal(2000, engine.PositionFrames);
+    }
+
+    [Fact]
+    public void Loop_with_zero_plays_never_leaves_the_region()
+    {
+        var (engine, _, _) = Setup(8000);
+        engine.SetLoopRegion(1000, 1500, plays: 0);
+        engine.Seek(1000);
+        Render(engine, 6000);
+        Assert.InRange(engine.PositionFrames, 1000, 1500);
+        Assert.Equal(0, engine.LoopRegion!.Plays);
+    }
+
+    [Fact]
     public void Effects_are_applied_when_exporting_too()
     {
         var (engine, strip, _) = Setup();

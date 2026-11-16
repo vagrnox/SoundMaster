@@ -35,8 +35,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _stretch = new TimeStretchProvider(_engine);
         Timeline.SeekRequested += OnSeekRequested;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
-        _timer.Tick += (_, _) => OnTick();
+        _timer.Tick += (_, _) => { OnTick(); PollHistory(); };
         _timer.Start();
+        InitHistory();
     }
 
     public TimelineViewModel Timeline { get; } = new();
@@ -122,7 +123,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         try
         {
             var result = await Task.Run(() => MixAnalyzer.Analyze(snapshot, cts.Token), cts.Token);
-            if (!cts.IsCancellationRequested) Analysis = result;
+            if (!cts.IsCancellationRequested)
+            {
+                Analysis = result;
+                TryAutoFillBpm(result);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -267,20 +272,32 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private void ApplyTracks(IReadOnlyList<AudioTrack> tracks, bool replace)
     {
+        // Nạp lần đầu (hoặc thay toàn bộ): sau khi phân tích xong sẽ tự điền BPM dò được.
+        bool fresh = replace || Tracks.Count == 0;
         _engine.Pause();
         IsPlaying = false;
         if (replace) Tracks.Clear();
-        foreach (var track in tracks)
-        {
-            int index = Tracks.Count;
-            var created = new TrackViewModel(new ChannelStrip(track), Timeline, index + 1, TrackPalette.ForIndex(index));
-            HookTrack(created);
-            Tracks.Add(created);
-        }
+        foreach (var track in tracks) AddTrackViewModel(track);
 
+        _autoBpmPending = fresh && tracks.Count > 0;
+        AfterTracksChanged(resetTransport: replace);
+    }
+
+    private TrackViewModel AddTrackViewModel(AudioTrack track)
+    {
+        int index = Tracks.Count;
+        var created = new TrackViewModel(new ChannelStrip(track), Timeline, index + 1, TrackPalette.ForIndex(index));
+        HookTrack(created);
+        Tracks.Add(created);
+        return created;
+    }
+
+    /// <summary>Đồng bộ engine, timeline, waveform tổng quan, vùng lặp và phân tích sau khi danh sách track đổi.</summary>
+    private void AfterTracksChanged(bool resetTransport)
+    {
         _engine.SetStrips(Tracks.Select(t => t.Strip));
         Timeline.DurationSeconds = MixerEngine.FramesToSeconds(_engine.LengthFrames);
-        if (replace)
+        if (resetTransport)
         {
             Timeline.PositionSeconds = 0;
             _engine.Seek(0);
@@ -349,10 +366,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var region = loops[0].Region;
         long start = MixerEngine.SecondsToFrames(region.StartSeconds);
         long end = MixerEngine.SecondsToFrames(region.EndSeconds);
-        _engine.SetLoopRegion(start, end);
+        _engine.SetLoopRegion(start, end, region.LoopPlays);
 
         // Vừa đặt vùng lặp mới mà playhead đang ngoài vùng thì nhảy về đầu vùng.
-        if (!ReferenceEquals(_loopOwner, region))
+        if (!ReferenceEquals(_loopOwner, region) && !_restoring)
         {
             _loopOwner = region;
             long position = _engine.PositionFrames;
@@ -549,6 +566,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        AutoSave?.Clear(); // thoát bình thường: không để lại bản phục hồi
         _timer.Stop();
         _analysisCts?.Cancel();
         _engine.Pause();

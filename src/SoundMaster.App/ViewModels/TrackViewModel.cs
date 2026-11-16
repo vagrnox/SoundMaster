@@ -183,6 +183,15 @@ public partial class TrackViewModel : ViewModelBase
         NotifyRegionsChanged();
     }
 
+    /// <summary>Đặt hiệu ứng Loop với tổng số lần nghe (0 = lặp mãi).</summary>
+    public void SetLoop(RegionViewModel region, int plays)
+    {
+        if (IsLocked || !Regions.Contains(region)) return;
+        region.LoopPlays = Math.Max(0, plays);
+        region.Effect = RegionEffect.Loop;
+        NotifyRegionsChanged();
+    }
+
     public void RemoveRegion(RegionViewModel region)
     {
         if (IsLocked || !Regions.Remove(region)) return;

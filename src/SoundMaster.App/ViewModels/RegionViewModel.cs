@@ -36,6 +36,11 @@ public partial class RegionViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(BadgeText))]
     public partial RegionEffect Effect { get; set; }
 
+    /// <summary>Hiệu ứng Loop: tổng số lần nghe đoạn (0 = lặp mãi cho tới khi gỡ), sau đó phát tiếp.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BadgeText))]
+    public partial int LoopPlays { get; set; } = 4;
+
     public double LengthSeconds => EndSeconds - StartSeconds;
 
     /// <summary>Tên hiệu ứng hiện thành nhãn giữa vùng; rỗng nếu chưa có hiệu ứng.</summary>
@@ -43,7 +48,7 @@ public partial class RegionViewModel : ViewModelBase
     {
         RegionEffect.FadeIn => "Fade in",
         RegionEffect.FadeOut => "Fade out",
-        RegionEffect.Loop => "Loop",
+        RegionEffect.Loop => LoopPlays <= 0 ? "Loop ∞" : $"Loop ×{LoopPlays}",
         RegionEffect.Silence => "Silence",
         RegionEffect.Reverse => "Reverse",
         _ => "",

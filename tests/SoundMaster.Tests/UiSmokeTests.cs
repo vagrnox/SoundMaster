@@ -30,7 +30,7 @@ public class UiSmokeTests
     private static MainWindow CreateWindow(out MainViewModel vm)
     {
         vm = new MainViewModel(enableAudioOutput: false);
-        var window = new MainWindow { DataContext = vm, Width = 1400, Height = 800 };
+        var window = new MainWindow { DataContext = vm, Width = 1400, Height = 800, ConfirmOnClose = false };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return window;
@@ -293,13 +293,13 @@ public class UiSmokeTests
 
         a.SetEffect(ra, RegionEffect.Loop);
         Assert.Empty(a.Strip.Effects);                 // Loop không phải hiệu ứng trên stem
-        Assert.Equal(new LoopRegion(44100, 3 * 44100), vm.ActiveLoop);
+        Assert.Equal(new LoopRegion(44100, 3 * 44100, 4), vm.ActiveLoop);
         Assert.Equal(1.0, vm.Timeline.PositionSeconds, 2); // playhead nhảy về đầu đoạn lặp
 
         // Đặt Loop ở vùng khác: vùng Loop cũ bị bỏ hiệu ứng.
         b.SetEffect(rb, RegionEffect.Loop);
         Assert.Equal(RegionEffect.None, ra.Effect);
-        Assert.Equal(new LoopRegion(5 * 44100, 7 * 44100), vm.ActiveLoop);
+        Assert.Equal(new LoopRegion(5 * 44100, 7 * 44100, 4), vm.ActiveLoop);
 
         // Bỏ hiệu ứng: hết lặp.
         b.SetEffect(rb, RegionEffect.None);

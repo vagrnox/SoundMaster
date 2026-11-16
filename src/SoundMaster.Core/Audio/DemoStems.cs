@@ -10,14 +10,16 @@ public static class DemoStems
         double beat = 60.0 / bpm;
         int beats = (int)(seconds / beat);
 
-        return
-        [
+        var stems = new List<AudioTrack>
+        {
             AudioTrack.FromFloat("Kick", Kick(frames, sr, beat, beats)),
             AudioTrack.FromFloat("Bass", Bass(frames, sr, beat, beats)),
             AudioTrack.FromFloat("Hi-hat", HiHat(frames, sr, beat, beats)),
             AudioTrack.FromFloat("Pad", Pad(frames, sr)),
             AudioTrack.FromFloat("Lead", Lead(frames, sr, beat, beats)),
-        ];
+        };
+        foreach (var stem in stems) stem.DemoKey = stem.Name; // để project có thể nạp lại stem tổng hợp
+        return stems;
     }
 
     private static float[] Kick(int frames, int sr, double beat, int beats)

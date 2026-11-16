@@ -129,6 +129,25 @@
             <Setter Property="Foreground" Value="#111111" />
         </Style>
 
+        <!-- Nút nhỏ trong thanh phân tích -->
+        <Style Selector="Button.tiny">
+            <Setter Property="Height" Value="18" />
+            <Setter Property="MinHeight" Value="18" />
+            <Setter Property="MinWidth" Value="26" />
+            <Setter Property="Padding" Value="7,0" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Background" Value="#1F1F1F" />
+            <Setter Property="Foreground" Value="#C8C8C8" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.tiny:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2C2C2C" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}" />
+        </Style>
+
         <!-- Nút "+ Add new track" ở chân sidebar: chữ chuyển màu primary khi rê chuột -->
         <Style Selector="Button.addTrack">
             <Setter Property="Background" Value="#101010" />
