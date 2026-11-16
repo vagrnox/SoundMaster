@@ -33,6 +33,15 @@ public sealed class MixerEngine : ISampleProvider
 
     public IReadOnlyList<ChannelStrip> Strips => _strips;
     public SafetyLimiter Limiter { get; } = new();
+
+    /// <summary>Đàn nghe thử nốt (phím piano roll), trộn thẳng vào đầu ra kể cả khi đang dừng.</summary>
+    public NotePreview Preview { get; } = new();
+
+    /// <summary>Phát các nốt (MIDI / nốt đã bóc) bằng đàn tổng hợp theo vị trí phát.</summary>
+    public NoteSequencer Notes { get; } = new();
+
+    /// <summary>Tắt tiếng mọi stem (chỉ nghe nốt, ví dụ khi ở piano roll).</summary>
+    public volatile bool StemsMuted;
     public PeakMeter MasterMeter { get; } = new();
     public bool Loop { get; set; }
 
@@ -112,6 +121,7 @@ public sealed class MixerEngine : ISampleProvider
         if (!_playing || !Monitor.TryEnter(_renderLock))
         {
             buffer.Clear();
+            Preview.MixInto(buffer);
             return buffer.Length;
         }
 
@@ -162,6 +172,8 @@ public sealed class MixerEngine : ISampleProvider
 
             if (done < frames)
                 buffer.Slice(done * 2, (frames - done) * 2).Clear();
+
+            Preview.MixInto(buffer);
 
             // Nếu UI vừa Seek trong lúc render thì giữ vị trí mới.
             Interlocked.CompareExchange(ref _position, pos, start);
@@ -251,7 +263,9 @@ public sealed class MixerEngine : ISampleProvider
         }
 
         foreach (var s in strips)
-            s.MixInto(_mix, frames, pos, audible: !anySolo || s.Soloed);
+            s.MixInto(_mix, frames, pos, audible: !StemsMuted && (!anySolo || s.Soloed));
+
+        Notes.MixInto(_mix, frames, pos);
 
         float target = Decibels.ToLinear(_masterGainDb, MasterMinDb);
         if (!_masterInitialized)

@@ -35,6 +35,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _enableAudioOutput = enableAudioOutput;
         _stretch = new TimeStretchProvider(_engine);
         Timeline.SeekRequested += OnSeekRequested;
+        Timeline.PropertyChanged += OnTimelineChangedForRoll;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += (_, _) => { OnTick(); PollHistory(); };
         _timer.Start();
@@ -306,6 +307,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Timeline.ZoomToFit();
         }
         OverviewPeaks = BuildOverview(Tracks.Select(t => t.Strip.Track).ToList());
+        RefreshNotePlayback();
         UpdateLoopRegion(null);
         EnsureOutput();
         StartAnalysis();
@@ -325,6 +327,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         track.SelectRequested += OnTrackSelectRequested;
         track.RegionsChanged += t => UpdateLoopRegion(t);
+        track.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TrackViewModel.Notes)) RefreshNotePlayback();
+        };
     }
 
     private void OnTrackSelectRequested(TrackViewModel track)
@@ -336,6 +342,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             other.DeactivateRegion();
         }
         track.IsSelected = true;
+        OnPropertyChanged(nameof(SelectedTrack));
+        RefreshNotePlayback();
+        SelectedNote = null;
+
+        // Trong piano roll, chuyển sang track chưa có nốt thì tự bóc luôn.
+        if (IsPianoRoll && !track.HasNotes && !track.IsTranscribing) _ = TranscribeTrackAsync(track);
     }
 
     /// <summary>
@@ -398,7 +410,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             track.ShowNotes = true;
             Status = notes.Count == 0
                 ? $"Không tìm thấy nốt đơn âm rõ trong \"{track.Name}\" (nhạc cụ đa âm hoặc bộ gõ?)."
-                : $"Bóc được {notes.Count} nốt từ \"{track.Name}\" ({TranscribedNote.NameOf(notes.Min(n => n.MidiNote))}–{TranscribedNote.NameOf(notes.Max(n => n.MidiNote))}).";
+                : $"Bóc được {notes.Count} nốt từ \"{track.Name}\" ({TranscribedNote.NameOf(notes.Min(n => n.MidiNote))}–{TranscribedNote.NameOf(notes.Max(n => n.MidiNote))}), {notes.Count(n => n.IsDoubtful)} nốt nghi ngờ.";
         }
         catch (Exception ex)
         {
@@ -472,6 +484,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Timeline.PositionSeconds = 0;
         }
         OverviewPeaks = BuildOverview(Tracks.Select(t => t.Strip.Track).ToList());
+        RefreshNotePlayback();
         UpdateLoopRegion(null);
         StartAnalysis();
         Status = $"Đã xóa track \"{track.Name}\".";

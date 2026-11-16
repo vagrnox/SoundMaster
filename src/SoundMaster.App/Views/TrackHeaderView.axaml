@@ -11,6 +11,7 @@
                 <MenuItem Header="Chuyển lên" Click="OnMoveUp" IsEnabled="{Binding IsEditable}" />
                 <MenuItem Header="Chuyển xuống" Click="OnMoveDown" IsEnabled="{Binding IsEditable}" />
                 <Separator />
+                <MenuItem Header="Mở piano roll" Click="OnOpenPianoRoll" />
                 <MenuItem Header="Bóc nốt (đơn âm → MIDI)" Click="OnTranscribe" IsEnabled="{Binding !IsTranscribing}" />
                 <MenuItem Header="Hiện / ẩn nốt trên waveform" Click="OnToggleNotes" IsEnabled="{Binding HasNotes}" />
                 <MenuItem Header="Xuất MIDI…" Click="OnExportMidi" IsEnabled="{Binding HasNotes}" />

@@ -14,6 +14,13 @@ public sealed class AudioTrack
     /// <summary>Số frame gộp vào một phần tử của <see cref="Peaks"/> (~2.9 ms ở 44.1 kHz).</summary>
     public const int PeakBucketFrames = 128;
 
+    /// <summary>Track im lặng (cho track MIDI: chỉ có nốt, không có audio).</summary>
+    public static AudioTrack Silent(string name, double seconds)
+    {
+        int frames = Math.Max(EngineFormat.SampleRate / 2, (int)Math.Ceiling(seconds * EngineFormat.SampleRate));
+        return new AudioTrack(name, new short[frames * 2], frames);
+    }
+
     public AudioTrack(string name, short[] samples, int frameCount)
     {
         Name = name;

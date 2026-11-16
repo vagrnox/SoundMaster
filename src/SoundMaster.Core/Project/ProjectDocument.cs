@@ -43,6 +43,21 @@ public sealed class ProjectTrack
     public bool Armed { get; set; }
     public bool Locked { get; set; }
     public List<ProjectRegion> Regions { get; set; } = [];
+
+    /// <summary>Track MIDI (không có audio: chỉ có nốt).</summary>
+    public bool Midi { get; set; }
+
+    /// <summary>Các nốt đã bóc / nhập từ MIDI (null nếu chưa có).</summary>
+    public List<ProjectNote>? Notes { get; set; }
+}
+
+public sealed class ProjectNote
+{
+    public double Start { get; set; }
+    public double End { get; set; }
+    public int Note { get; set; }
+    public int Velocity { get; set; } = 90;
+    public double Confidence { get; set; } = 1;
 }
 
 public sealed class ProjectRegion

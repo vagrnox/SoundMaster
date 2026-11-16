@@ -418,6 +418,104 @@ public class ProjectViewModelTests
         vm.Dispose();
     }
 
+    private static List<SoundMaster.Core.Transcription.TranscribedNote> SampleNotes() =>
+    [
+        new(0.0, 0.5, 60, 100),
+        new(0.5, 1.0, 64, 90),
+        new(1.0, 2.0, 67, 80),
+    ];
+
+    [AvaloniaFact]
+    public async Task Import_midi_creates_midi_track_opens_roll_plays_and_roundtrips_in_project()
+    {
+        string dir = TempDir();
+        try
+        {
+            string midi = Path.Combine(dir, "melody.mid");
+            SoundMaster.Core.Transcription.MidiExporter.Export(midi, SampleNotes(), bpm: 90, trackName: "Melody");
+
+            var vm = NewVm();
+            await vm.ImportMidiAsync(midi);
+
+            var track = Assert.Single(vm.Tracks);
+            Assert.True(track.IsMidi);
+            Assert.Equal("Melody", track.Name);
+            Assert.Equal([60, 64, 67], track.Notes.Select(n => n.MidiNote).ToArray());
+            Assert.Equal(1.0, track.Notes[2].StartSeconds, 2);
+            Assert.Equal(90, vm.Timeline.Bpm, 1);
+            Assert.True(vm.IsPianoRoll);
+            Assert.True(track.IsSelected);
+            Assert.True(vm.IsPlaying);
+            Assert.True(vm.Timeline.DurationSeconds >= 2.4);
+
+            // Sửa nốt rồi lưu / mở lại project: nốt và cờ MIDI được giữ.
+            vm.SelectedNote = track.Notes[0];
+            vm.ReplaceNote(track.Notes[0], track.Notes[0] with { MidiNote = 62 });
+            string proj = Path.Combine(dir, "song.smx");
+            vm.SaveProject(proj);
+
+            var vm2 = NewVm();
+            Assert.True(await vm2.OpenProjectAsync(proj));
+            var t2 = Assert.Single(vm2.Tracks);
+            Assert.True(t2.IsMidi);
+            Assert.Equal([62, 64, 67], t2.Notes.Select(n => n.MidiNote).ToArray());
+            vm2.Dispose();
+            vm.Dispose();
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void Note_editing_split_merge_quantize_add_and_replace()
+    {
+        var vm = NewVm();
+        vm.LoadDemoCommand.Execute(null);
+        var track = vm.Tracks.First(t => t.Name == "Lead");
+        vm.Timeline.Bpm = 120;      // 1 phách = 0,5 s; lưới 1/16 = 0,125 s
+        vm.GridIndex = 2;
+        track.Notes = [new(0.06, 0.52, 60, 90, 0.3), new(0.55, 1.07, 64, 90)];
+        track.RequestSelect();
+
+        // Sửa tay: đổi cao độ → thành nốt chính.
+        var first = track.Notes[0];
+        Assert.True(first.IsDoubtful);
+        vm.ReplaceNote(first, first with { MidiNote = 61 });
+        Assert.Equal(61, track.Notes[0].MidiNote);
+        Assert.False(track.Notes[0].IsDoubtful);
+
+        // Tách giữa nốt thứ hai (playhead ngoài nốt → tách đôi).
+        vm.SelectedNote = track.Notes[1];
+        vm.Timeline.PositionSeconds = 0;
+        vm.SplitNoteCommand.Execute(null);
+        Assert.Equal(3, track.Notes.Count);
+        Assert.Equal(track.Notes[1].EndSeconds, track.Notes[2].StartSeconds, 6);
+
+        // Gộp lại: nốt chọn (nửa đầu) + nốt kế → một nốt.
+        vm.SelectedNote = track.Notes[1];
+        vm.MergeNoteCommand.Execute(null);
+        Assert.Equal(2, track.Notes.Count);
+
+        // Căn nhịp: đầu / cuối vào bội của 0,125 s.
+        vm.QuantizeNotesCommand.Execute(null);
+        Assert.All(track.Notes, n =>
+        {
+            Assert.Equal(0, n.StartSeconds / 0.125 - Math.Round(n.StartSeconds / 0.125), 6);
+            Assert.Equal(0, n.EndSeconds / 0.125 - Math.Round(n.EndSeconds / 0.125), 6);
+            Assert.True(n.Duration >= 0.125 - 1e-9);
+        });
+
+        // Vẽ nốt mới bám lưới.
+        vm.AddNote(2.07, 70);
+        var added = track.Notes.Single(n => n.MidiNote == 70);
+        Assert.Equal(2.0, added.StartSeconds, 6);
+        Assert.Equal(2.125, added.EndSeconds, 6);
+        Assert.Same(added, vm.SelectedNote);
+        vm.Dispose();
+    }
+
     [AvaloniaFact]
     public async Task Transcribe_demo_bass_and_lead_then_export_midi()
     {

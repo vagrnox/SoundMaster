@@ -21,6 +21,11 @@ public partial class TrackHeaderView : UserControl
     /// <summary>Bấm vào header (ngoài các nút) cũng chọn track.</summary>
     private void OnHeaderPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e) => Track?.RequestSelect();
 
+    private async void OnOpenPianoRoll(object? sender, RoutedEventArgs e)
+    {
+        if (Main is { } main && Track is { } track) await main.OpenPianoRollAsync(track);
+    }
+
     private async void OnTranscribe(object? sender, RoutedEventArgs e)
     {
         if (Main is { } main && Track is { } track) await main.TranscribeTrackAsync(track);

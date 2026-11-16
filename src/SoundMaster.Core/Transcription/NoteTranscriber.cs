@@ -3,8 +3,14 @@ using SoundMaster.Core.Audio;
 namespace SoundMaster.Core.Transcription;
 
 /// <summary>Một nốt đã bóc: thời gian (giây), số nốt MIDI (60 = C4) và vận tốc (1..127).</summary>
-public sealed record TranscribedNote(double StartSeconds, double EndSeconds, int MidiNote, int Velocity)
+public sealed record TranscribedNote(double StartSeconds, double EndSeconds, int MidiNote, int Velocity,
+    double Confidence = 1.0)
 {
+    /// <summary>Dưới ngưỡng này nốt bị coi là nghi ngờ (quá ngắn, quá nhỏ, cao độ không ổn định).</summary>
+    public const double DoubtfulBelow = 0.5;
+
+    public bool IsDoubtful => Confidence < DoubtfulBelow;
+
     public double Duration => EndSeconds - StartSeconds;
 
     public static string NameOf(int midiNote)
@@ -106,7 +112,46 @@ public static class NoteTranscriber
         }
 
         Flush();
-        return notes;
+        return ScoreNotes(notes, frames);
+    }
+
+    /// <summary>
+    /// Chấm điểm tin cậy từng nốt: dài (≥ 0,2 s thì đủ điểm), to so với nốt to nhất của track,
+    /// và độ chắc chắn cao độ (YIN) trung bình trong nốt. Thấp thì là nốt nghi ngờ (hiện màu đỏ).
+    /// </summary>
+    private static IReadOnlyList<TranscribedNote> ScoreNotes(List<TranscribedNote> notes, IReadOnlyList<PitchFrame> frames)
+    {
+        if (notes.Count == 0) return notes;
+
+        var stats = new (double Db, double Conf)[notes.Count];
+        for (int i = 0; i < notes.Count; i++)
+        {
+            double db = 0, conf = 0;
+            int n = 0;
+            foreach (var f in frames)
+            {
+                if (f.Time < notes[i].StartSeconds) continue;
+                if (f.Time > notes[i].EndSeconds) break;
+                if (!f.IsVoiced) continue;
+                db += f.RmsDb;
+                conf += f.Confidence;
+                n++;
+            }
+            stats[i] = n == 0 ? (-60, 0) : (db / n, conf / n);
+        }
+
+        double maxDb = stats.Max(s => s.Db);
+        var scored = new List<TranscribedNote>(notes.Count);
+        for (int i = 0; i < notes.Count; i++)
+        {
+            double dur = Math.Clamp((notes[i].Duration - MinNoteSeconds) / (0.20 - MinNoteSeconds), 0, 1);
+            double loud = Math.Clamp((stats[i].Db - (maxDb - 26)) / 14.0, 0, 1);
+            double pitch = Math.Clamp((stats[i].Conf - 0.55) / 0.35, 0, 1);
+            double score = 0.4 * dur + 0.3 * loud + 0.3 * pitch;
+            scored.Add(notes[i] with { Confidence = Math.Round(score, 3) });
+        }
+
+        return scored;
     }
 
     private static void AddNote(List<TranscribedNote> notes, IReadOnlyList<PitchFrame> frames, double[] smooth,

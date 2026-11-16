@@ -10,6 +10,7 @@ using SoundMaster.Core.Analysis;
 using SoundMaster.Core.Audio;
 using SoundMaster.Core.Editing;
 using SoundMaster.Core.Project;
+using SoundMaster.Core.Transcription;
 
 namespace SoundMaster.App.ViewModels;
 
@@ -79,6 +80,8 @@ public partial class MainViewModel
                 Soloed = t.IsSolo,
                 Armed = t.IsArmed,
                 Locked = t.IsLocked,
+                Midi = t.IsMidi,
+                Notes = t.Notes.Count == 0 ? null : t.Notes.Select(n => new ProjectNote { Start = n.StartSeconds, End = n.EndSeconds, Note = n.MidiNote, Velocity = n.Velocity, Confidence = n.Confidence }).ToList(),
                 Regions = t.Regions
                     .Select(r => new ProjectRegion { Start = r.StartSeconds, End = r.EndSeconds, Effect = r.Effect.ToString(), LoopPlays = r.LoopPlays })
                     .ToList(),
@@ -99,6 +102,8 @@ public partial class MainViewModel
         track.IsMuted = saved.Muted;
         track.IsSolo = saved.Soloed;
         track.IsArmed = saved.Armed;
+        track.IsMidi = saved.Midi;
+        track.Notes = saved.Notes is null ? [] : saved.Notes.Select(n => new TranscribedNote(n.Start, n.End, n.Note, n.Velocity, n.Confidence)).ToList();
 
         track.Regions.Clear();
         track.ActiveRegion = null;
@@ -252,7 +257,11 @@ public partial class MainViewModel
                 Status = $"Đang nạp {i + 1}/{doc.Tracks.Count}: {saved.Name}";
                 try
                 {
-                    if (saved.Demo is not null)
+                    if (saved.Midi)
+                    {
+                        audio.Add(AudioTrack.Silent(saved.Name, (saved.Notes?.Count > 0 ? saved.Notes.Max(n => n.End) : 0) + 0.5));
+                    }
+                    else if (saved.Demo is not null)
                     {
                         demo ??= DemoStems.Generate();
                         var stem = demo.FirstOrDefault(s => s.DemoKey == saved.Demo);

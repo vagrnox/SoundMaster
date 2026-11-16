@@ -51,6 +51,7 @@
                                 <Separator />
                                 <MenuItem Header="📂  Mở thư mục stems…" Click="OnOpenFolder" />
                                 <MenuItem Header="➕  Thêm file âm thanh…" Click="OnAddFiles" />
+                                <MenuItem Header="🎼  Mở file MIDI…" Click="OnOpenMidi" />
                                 <MenuItem Header="🎹  Nạp stem demo" Click="OnLoadDemo" />
                                 <Separator />
                                 <MenuItem Header="🗑  Xóa tất cả track" Click="OnClear" />
@@ -295,7 +296,9 @@
         </Border>
 
         <!-- ================= Vùng làm việc ================= -->
-        <Grid x:Name="Workspace" ColumnDefinitions="300,*" RowDefinitions="44,*,26,14">
+        <Panel>
+        <views:PianoRollView IsVisible="{Binding IsPianoRoll}" ZIndex="10" />
+        <Grid x:Name="Workspace" ColumnDefinitions="300,*" RowDefinitions="44,*,26,14" IsVisible="{Binding !IsPianoRoll}">
 
             <!-- Ô đầu sidebar: volume tổng + limiter + khóa -->
             <Border Grid.Row="0" Grid.Column="0" Background="#141414" BorderBrush="#4A4F57" BorderThickness="0,0,0,1">
@@ -411,6 +414,7 @@
                                  OffsetSeconds="{Binding Timeline.OffsetSeconds}"
                                  PixelsPerSecond="{Binding Timeline.PixelsPerSecond}" />
         </Grid>
+        </Panel>
     </DockPanel>
 
     <!-- Lớp phủ cho "ghost" khi kéo đổi thứ tự track -->

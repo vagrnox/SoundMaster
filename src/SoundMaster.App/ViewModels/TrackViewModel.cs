@@ -128,17 +128,33 @@ public partial class TrackViewModel : ViewModelBase
 
     /// <summary>Các nốt đã bóc từ stem này (rỗng nếu chưa bóc). Dữ liệu suy ra từ audio nên không lưu vào project.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasNotes))]
+    [NotifyPropertyChangedFor(nameof(HasNotes), nameof(DoubtfulCount), nameof(HasDoubtful), nameof(NotesSummary))]
     public partial IReadOnlyList<TranscribedNote> Notes { get; set; } = [];
 
     public bool HasNotes => Notes.Count > 0;
+
+    /// <summary>Số nốt nghi ngờ (hiện màu đỏ).</summary>
+    public int DoubtfulCount => Notes.Count(n => n.IsDoubtful);
+
+    public bool HasDoubtful => DoubtfulCount > 0;
+
+    public string EmptyNotesHint => IsTranscribing
+        ? "Đang bóc nốt…"
+        : "Chưa có nốt nào (stem không đơn âm, hoặc quá nhỏ?). Thử “Bóc lại”.";
+
+    public string NotesSummary => Notes.Count == 0 ? (IsTranscribing ? "đang bóc…" : "chưa bóc") : $"{Notes.Count} nốt";
 
     /// <summary>Vẽ các nốt đã bóc chồng lên waveform.</summary>
     [ObservableProperty]
     public partial bool ShowNotes { get; set; } = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NotesSummary), nameof(EmptyNotesHint))]
     public partial bool IsTranscribing { get; set; }
+
+    /// <summary>Track MIDI: không có audio, chỉ có nốt (phát bằng đàn tổng hợp).</summary>
+    [ObservableProperty]
+    public partial bool IsMidi { get; set; }
 
     // ---------- vùng chọn & hiệu ứng ----------
 

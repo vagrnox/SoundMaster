@@ -503,4 +503,192 @@ public class UiSmokeTests
         Assert.Equal(0, t.OffsetSeconds);
         window.Close();
     }
+
+    private static void Await(Task task)
+    {
+        var timeout = DateTime.UtcNow.AddSeconds(30);
+        while (!task.IsCompleted && DateTime.UtcNow < timeout)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(10);
+        }
+        Dispatcher.UIThread.RunJobs();
+        task.GetAwaiter().GetResult();
+    }
+
+    [AvaloniaFact]
+    public void PianoRoll_opens_transcribes_and_renders_notes()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var lead = vm.Tracks.First(t => t.Name == "Lead");
+        Assert.False(lead.HasNotes);
+        Await(vm.OpenPianoRollAsync(lead));
+
+        Assert.True(vm.IsPianoRoll);
+        Assert.True(lead.IsSelected);
+        Assert.True(lead.HasNotes, vm.Status);
+
+        var roll = window.GetVisualDescendants().OfType<PianoRollCanvas>().Single();
+        var keys = window.GetVisualDescendants().OfType<PianoKeysView>().Single();
+        Assert.True(roll.IsEffectivelyVisible);
+        Assert.False(window.FindControl<Grid>("Workspace")!.IsVisible);
+        Assert.Same(lead, roll.Track);
+
+        // Khung nhìn được căn theo khoảng nốt: mọi nốt nằm trong vùng nhìn thấy.
+        double visibleRows = roll.Bounds.Height / vm.RollRowHeight;
+        Assert.All(lead.Notes, n =>
+        {
+            Assert.True(n.MidiNote + 1 <= vm.RollTopNote + 0.01, $"{n.Name} ngoài đỉnh");
+            Assert.True(n.MidiNote >= vm.RollTopNote - visibleRows - 0.01, $"{n.Name} ngoài đáy");
+        });
+
+        // Chụp màn hình để xem.
+        vm.Timeline.PositionSeconds = 4;
+        Dispatcher.UIThread.RunJobs();
+        var frame = window.CaptureRenderedFrame();
+        Assert.NotNull(frame);
+        frame!.Save(Path.Combine(Path.GetTempPath(), "soundmaster_roll.png"));
+
+        // Chuyển sang track khác chưa có nốt → tự bóc.
+        var bass = vm.Tracks.First(t => t.Name == "Bass");
+        Assert.False(bass.HasNotes);
+        bass.RequestSelect();
+        Assert.True(bass.IsTranscribing);
+        var timeout = DateTime.UtcNow.AddSeconds(30);
+        while (bass.IsTranscribing && DateTime.UtcNow < timeout)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(10);
+        }
+        Assert.True(bass.HasNotes, vm.Status);
+        Assert.Same(bass, roll.Track);
+
+        // Esc quay về mixer.
+        window.KeyPress(Avalonia.Input.Key.Escape, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.Escape, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(vm.IsPianoRoll);
+        Assert.True(window.FindControl<Grid>("Workspace")!.IsVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Double_click_on_track_header_opens_piano_roll_and_transcribes()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var lead = vm.Tracks.First(t => t.Name == "Lead");
+        var header = window.GetVisualDescendants().OfType<TrackHeaderView>().First(h => ReferenceEquals(h.DataContext, lead));
+        var p = header.TranslatePoint(new Point(2, 30), window)!.Value; // vạch màu bên trái, không phải điều khiển
+
+        window.MouseDown(p, Avalonia.Input.MouseButton.Left);
+        window.MouseUp(p, Avalonia.Input.MouseButton.Left);
+        Assert.False(vm.IsPianoRoll);
+        window.MouseDown(p, Avalonia.Input.MouseButton.Left);
+        window.MouseUp(p, Avalonia.Input.MouseButton.Left);
+
+        Assert.True(vm.IsPianoRoll);
+        var timeout = DateTime.UtcNow.AddSeconds(30);
+        while (lead.IsTranscribing || (!lead.HasNotes && DateTime.UtcNow < timeout))
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(10);
+        }
+        Assert.True(lead.HasNotes, vm.Status);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void PianoRoll_mouse_drag_moves_and_resizes_notes_and_double_click_adds()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        var lead = vm.Tracks.First(t => t.Name == "Lead");
+        vm.Timeline.Bpm = 120;
+        vm.GridIndex = 1; // 1/8 = 0,25 s
+        lead.Notes =
+        [
+            new(1.0, 2.0, 64, 100),
+            new(2.5, 3.0, 67, 90, 0.2),
+            new(3.0, 3.5, 60, 90),
+            new(4.0, 4.6, 65, 90),
+        ];
+        lead.RequestSelect();
+        vm.IsPianoRoll = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var roll = window.GetVisualDescendants().OfType<PianoRollCanvas>().Single();
+        double pps = vm.Timeline.PixelsPerSecond;
+        double rh = vm.RollRowHeight;
+        Point P(double seconds, int midi) => roll.TranslatePoint(
+            new Point((seconds - vm.Timeline.OffsetSeconds) * pps, (vm.RollTopNote - midi - 0.5) * rh), window)!.Value;
+
+        // Kéo thân nốt đầu sang phải 1 s và lên 3 nửa cung.
+        var n0 = lead.Notes[0];
+        window.MouseDown(P(1.5, 64), MouseButton.Left);
+        window.MouseMove(P(1.8, 65));
+        window.MouseMove(P(2.5, 67));
+        window.MouseUp(P(2.5, 67), MouseButton.Left);
+        var moved = lead.Notes.Single(n => n.MidiNote == 67 && n.Duration > 0.9);
+        Assert.Equal(2.0, moved.StartSeconds, 1);
+        Assert.Equal(1.0, moved.Duration, 2);
+        Assert.Same(moved, vm.SelectedNote);
+
+        // Kéo cạnh phải của nốt cuối (4.0–4.6) dài thêm: bám lưới 0,25 s.
+        var last = lead.Notes.Single(n => n.MidiNote == 65);
+        double edgeX = (last.EndSeconds - vm.Timeline.OffsetSeconds) * pps - 2;
+        var edge = roll.TranslatePoint(new Point(edgeX, (vm.RollTopNote - 65 - 0.5) * rh), window)!.Value;
+        window.MouseDown(edge, MouseButton.Left);
+        window.MouseMove(edge + new Vector(pps * 0.4, 0));
+        window.MouseMove(edge + new Vector(pps * 0.9, 0));
+        window.MouseUp(edge + new Vector(pps * 0.9, 0), MouseButton.Left);
+        var resized = lead.Notes.Single(n => n.MidiNote == 65);
+        Assert.Equal(4.0, resized.StartSeconds, 6);
+        Assert.True(resized.EndSeconds > 5.0 && resized.EndSeconds < 5.7, $"end={resized.EndSeconds}");
+        Assert.Equal(0, resized.EndSeconds / 0.25 - Math.Round(resized.EndSeconds / 0.25), 6);
+
+        // Đúp-click chỗ trống: thêm nốt.
+        int before = lead.Notes.Count;
+        var empty = P(6.0, 66);
+        window.MouseDown(empty, MouseButton.Left);
+        window.MouseUp(empty, MouseButton.Left);
+        window.MouseDown(empty, MouseButton.Left);
+        window.MouseUp(empty, MouseButton.Left);
+        Assert.Equal(before + 1, lead.Notes.Count);
+        Assert.Contains(lead.Notes, n => n.MidiNote == 66);
+
+        var frame = window.CaptureRenderedFrame();
+        frame!.Save(Path.Combine(Path.GetTempPath(), "soundmaster_roll2.png"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void PianoRoll_delete_doubtful_and_selected_notes()
+    {
+        var window = CreateWindow(out var vm);
+        vm.LoadDemoCommand.Execute(null);
+        var lead = vm.Tracks.First(t => t.Name == "Lead");
+        lead.Notes =
+        [
+            new(0.0, 0.5, 60, 100, 0.9),
+            new(0.5, 0.56, 64, 40, 0.2),
+            new(1.0, 1.5, 67, 90, 0.8),
+        ];
+        lead.RequestSelect();
+        Assert.Equal(1, lead.DoubtfulCount);
+
+        vm.SelectedNote = lead.Notes[2];
+        vm.DeleteSelectedNote();
+        Assert.Equal(2, lead.Notes.Count);
+        Assert.Null(vm.SelectedNote);
+
+        vm.DeleteDoubtfulNotesCommand.Execute(null);
+        Assert.Single(lead.Notes);
+        Assert.Equal(60, lead.Notes[0].MidiNote);
+        window.Close();
+    }
 }

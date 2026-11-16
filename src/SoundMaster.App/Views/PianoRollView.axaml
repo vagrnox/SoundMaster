@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:SoundMaster.App.ViewModels"
+             xmlns:ctl="using:SoundMaster.App.Controls"
+             x:Class="SoundMaster.App.Views.PianoRollView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Styles>
+        <!-- Track ở sidebar piano roll: track đang chọn sáng, các track khác mờ đi -->
+        <Style Selector="Border.rollTrack">
+            <Setter Property="Opacity" Value="0.42" />
+            <Setter Property="Background" Value="#141414" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Border.rollTrack:pointerover">
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="Border.rollTrack.active">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="#2C323A" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid x:Name="RollGrid" ColumnDefinitions="300,48,*" RowDefinitions="44,*,26,14" Background="#0B0B0B">
+
+        <!-- Đầu sidebar: quay lại mixer -->
+        <Border Grid.Row="0" Grid.Column="0" Background="#141414" BorderBrush="#4A4F57" BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="Auto,*" Margin="10,0,10,0">
+                <Button Grid.Column="0" Classes="pill" Padding="12,5" VerticalAlignment="Center"
+                        Command="{Binding ClosePianoRollCommand}" ToolTip.Tip="Về mixer (Esc)">
+                    <TextBlock Text="←  Mixer" FontSize="12" />
+                </Button>
+                <TextBlock Grid.Column="1" Text="Piano roll" FontSize="13" FontWeight="SemiBold" Opacity="0.8"
+                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Danh sách track + các thao tác trên nốt -->
+        <DockPanel Grid.Row="1" Grid.RowSpan="3" Grid.Column="0" Background="#141414">
+            <Border DockPanel.Dock="Bottom" BorderBrush="#2A2A2A" BorderThickness="0,1,0,0" Padding="10,8">
+                <StackPanel Spacing="6">
+                    <TextBlock FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                               Text="Vàng = nốt chính · Đỏ = nghi ngờ (ngắn, nhỏ, cao độ không chắc). Sửa tay thì nốt thành vàng." />
+
+                    <!-- Lưới nhịp: bám khi kéo + độ chia + căn tất cả -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                        <ToggleButton Grid.Column="0" Classes="mini solo" Content="⌗" IsChecked="{Binding SnapToGrid}"
+                                      ToolTip.Tip="Bám lưới nhịp khi kéo / vẽ nốt" />
+                        <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MainViewModel.GridChoices}"
+                                  SelectedIndex="{Binding GridIndex}" HorizontalAlignment="Stretch" MinHeight="28"
+                                  Padding="8,2" FontSize="12" ToolTip.Tip="Độ chia lưới (theo BPM)" />
+                        <Button Grid.Column="2" Classes="pill" Padding="10,5" Command="{Binding QuantizeNotesCommand}"
+                                IsEnabled="{Binding SelectedTrack.HasNotes}"
+                                ToolTip.Tip="Căn đầu / cuối mọi nốt vào lưới (Q)">
+                            <TextBlock Text="Căn nhịp" FontSize="12" />
+                        </Button>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                        <Button Grid.Column="0" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Command="{Binding SplitNoteCommand}" IsEnabled="{Binding SelectedNote, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                ToolTip.Tip="Tách nốt đang chọn tại playhead (S)">
+                            <TextBlock Text="Tách" FontSize="12" />
+                        </Button>
+                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Command="{Binding MergeNoteCommand}" IsEnabled="{Binding SelectedNote, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                ToolTip.Tip="Gộp nốt đang chọn với nốt kế tiếp (M)">
+                            <TextBlock Text="Gộp" FontSize="12" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Command="{Binding DeleteDoubtfulNotesCommand}" IsEnabled="{Binding SelectedTrack.HasDoubtful}"
+                                ToolTip.Tip="Xóa tất cả nốt đỏ">
+                            <TextBlock FontSize="12"><Run Text="Xóa đỏ " /><Run Text="{Binding SelectedTrack.DoubtfulCount}" /></TextBlock>
+                        </Button>
+                    </Grid>
+
+                    <CheckBox IsChecked="{Binding RollListenStems}" FontSize="12" Content="Nghe cả stem gốc"
+                              ToolTip.Tip="Mặc định ở piano roll chỉ nghe nốt (đàn tổng hợp)" />
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                        <Button Grid.Column="0" Classes="pill" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center" Command="{Binding RetranscribeCommand}"
+                                ToolTip.Tip="Bóc lại từ audio (mất các chỉnh sửa tay)">
+                            <TextBlock Text="Bóc lại" FontSize="12" />
+                        </Button>
+                        <Button Grid.Column="1" Classes="gold" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center" Click="OnExportMidi"
+                                IsEnabled="{Binding SelectedTrack.HasNotes}">
+                            <TextBlock Text="Xuất MIDI…" FontSize="12" />
+                        </Button>
+                    </Grid>
+                    <TextBlock FontSize="11" Opacity="0.45" TextWrapping="Wrap"
+                               Text="Kéo nốt: dời · kéo cạnh: đổi độ dài · đúp-click chỗ trống: vẽ nốt · Delete / chuột phải: xóa." />
+                </StackPanel>
+            </Border>
+
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Tracks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TrackViewModel">
+                            <Border Classes="rollTrack" Classes.active="{Binding IsSelected}" Height="56"
+                                    BorderBrush="#000000" BorderThickness="0,0,0,2"
+                                    PointerPressed="OnTrackPressed">
+                                <Grid ColumnDefinitions="5,*">
+                                    <Border Grid.Column="0" Background="{Binding ColorBrush}" />
+                                    <StackPanel Grid.Column="1" Margin="12,0,10,0" VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding NotesSummary}" FontSize="11" Opacity="0.6" />
+                                            <TextBlock FontSize="11" Foreground="#FF6B6B" IsVisible="{Binding HasDoubtful}">
+                                                <Run Text="{Binding DoubtfulCount}" /><Run Text=" nghi ngờ" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+
+        <!-- Thước nhịp -->
+        <Border Grid.Row="0" Grid.Column="1" Background="#0B0B0B" />
+        <ctl:TimelineRuler x:Name="RollRuler" Grid.Row="0" Grid.Column="2" Mode="Bars"
+                           PixelsPerSecond="{Binding Timeline.PixelsPerSecond}"
+                           OffsetSeconds="{Binding Timeline.OffsetSeconds}"
+                           Bpm="{Binding Timeline.Bpm}"
+                           SeekCommand="{Binding Timeline.SeekCommand}" />
+        <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" BorderBrush="#4A4F57" BorderThickness="0,0,0,1"
+                IsHitTestVisible="False" ZIndex="5" />
+
+        <!-- Phím đàn -->
+        <ctl:PianoKeysView x:Name="Keys" Grid.Row="1" Grid.Column="1"
+                           TopNote="{Binding RollTopNote}" RowHeight="{Binding RollRowHeight}" />
+
+        <!-- Lưới + waveform + nốt -->
+        <ctl:PianoRollCanvas x:Name="Roll" Grid.Row="1" Grid.Column="2"
+                             Track="{Binding SelectedTrack}"
+                             TopNote="{Binding RollTopNote}" RowHeight="{Binding RollRowHeight}"
+                             PixelsPerSecond="{Binding Timeline.PixelsPerSecond}"
+                             OffsetSeconds="{Binding Timeline.OffsetSeconds}"
+                             Bpm="{Binding Timeline.Bpm}"
+                             PositionSeconds="{Binding Timeline.PositionSeconds}"
+                             SnapSeconds="{Binding RollSnapSeconds}"
+                             SelectedNote="{Binding SelectedNote, Mode=TwoWay}" />
+
+        <!-- Thông báo trạng thái ở giữa lưới -->
+        <Border Grid.Row="1" Grid.Column="2" IsHitTestVisible="False" HorizontalAlignment="Center"
+                VerticalAlignment="Center" Background="#CC0B0B0B" CornerRadius="10" Padding="18,10"
+                IsVisible="{Binding !SelectedTrack.HasNotes}">
+            <TextBlock FontSize="13" Opacity="0.85" Text="{Binding SelectedTrack.EmptyNotesHint}" />
+        </Border>
+
+        <!-- Hàng dưới: thước thời gian + cuộn ngang -->
+        <Border Grid.Row="2" Grid.Column="1" Background="#0B0B0B" />
+        <ctl:TimelineRuler Grid.Row="2" Grid.Column="2" Mode="Time"
+                           PixelsPerSecond="{Binding Timeline.PixelsPerSecond}"
+                           OffsetSeconds="{Binding Timeline.OffsetSeconds}"
+                           SeekCommand="{Binding Timeline.SeekCommand}" />
+        <ScrollBar Grid.Row="3" Grid.Column="2" Orientation="Horizontal" AllowAutoHide="False"
+                   Minimum="0" Maximum="{Binding Timeline.ScrollMaximum}"
+                   Value="{Binding Timeline.OffsetSeconds, Mode=TwoWay}"
+                   ViewportSize="{Binding Timeline.ViewportSeconds}" />
+
+        <ctl:PlayheadOverlay Grid.Row="0" Grid.RowSpan="3" Grid.Column="2"
+                             PositionSeconds="{Binding Timeline.PositionSeconds}"
+                             OffsetSeconds="{Binding Timeline.OffsetSeconds}"
+                             PixelsPerSecond="{Binding Timeline.PixelsPerSecond}" />
+    </Grid>
+</UserControl>

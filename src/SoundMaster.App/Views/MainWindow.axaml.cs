@@ -62,10 +62,13 @@ public partial class MainWindow : Window
         _headerScroll.PointerCaptureLost += OnHeaderCaptureLost;
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
 
+        // Bấm đúp vào header của một track (không phải waveform, vì ở đó bấm-rồi-kéo liền nhau là tạo vùng): bóc nốt (nếu cần) rồi mở piano roll.
+        _headerScroll.AddHandler(DoubleTappedEvent, OnTrackDoubleTapped);
+
         // Kéo file âm thanh thả vào bất kỳ đâu trong vùng làm việc để tạo track mới.
-        DragDrop.SetAllowDrop(_workspace, true);
-        _workspace.AddHandler(DragDrop.DragOverEvent, OnWorkspaceDragOver);
-        _workspace.AddHandler(DragDrop.DropEvent, OnWorkspaceDrop);
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, OnWorkspaceDragOver);
+        AddHandler(DragDrop.DropEvent, OnWorkspaceDrop);
 
         Closing += OnWindowClosing;
         Opened += async (_, _) => await CheckRecoveryAsync();
@@ -75,6 +78,25 @@ public partial class MainWindow : Window
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
     private MainViewModel? Vm => DataContext as MainViewModel;
+
+    private async void OnTrackDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (Vm is not { } vm || e.Source is not Visual source) return;
+
+        // Bỏ qua khi bấm đúp vào ô tên (đổi tên) hoặc các nút / thanh điều khiển.
+        foreach (var v in source.GetSelfAndVisualAncestors())
+        {
+            if (v is TextBox or Button or Avalonia.Controls.Primitives.ToggleButton or VolumeBar or PanBar) return;
+            if (v is TrackHeaderView or ScrollViewer) break;
+        }
+
+        if ((source as StyledElement)?.DataContext is TrackViewModel track)
+        {
+
+            e.Handled = true;
+            await vm.OpenPianoRollAsync(track);
+        }
+    }
 
     private void SyncVerticalScroll(ScrollViewer from, ScrollViewer to)
     {
@@ -188,6 +210,16 @@ public partial class MainWindow : Window
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (HandleShortcut(e)) { e.Handled = true; return; }
+
+        if (Vm is { IsPianoRoll: true } roll && FocusManager?.GetFocusedElement() is not TextBox)
+        {
+            if (e.Key == Key.Escape) { roll.ClosePianoRollCommand.Execute(null); e.Handled = true; return; }
+            if (e.Key == Key.Delete) { roll.DeleteSelectedNote(); e.Handled = true; return; }
+            if (e.KeyModifiers == KeyModifiers.None && e.Key == Key.S) { roll.SplitNoteCommand.Execute(null); e.Handled = true; return; }
+            if (e.KeyModifiers == KeyModifiers.None && e.Key == Key.M) { roll.MergeNoteCommand.Execute(null); e.Handled = true; return; }
+            if (e.KeyModifiers == KeyModifiers.None && e.Key == Key.Q) { roll.QuantizeNotesCommand.Execute(null); e.Handled = true; return; }
+        }
+
         if (e.Key != Key.Escape || _dragFrom < 0 || _dragFinishing) return;
         e.Handled = true;
         if (_dragActive) EndDrag(commit: false);
@@ -561,6 +593,19 @@ public partial class MainWindow : Window
         if (path is not null) await Vm.OpenFolderAsync(path);
     }
 
+    private async void OnOpenMidi(object? sender, RoutedEventArgs e)
+    {
+        if (Vm is null) return;
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Chọn file MIDI",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("MIDI") { Patterns = ["*.mid", "*.midi"] }],
+        });
+        var path = files.FirstOrDefault()?.TryGetLocalPath();
+        if (path is not null) await Vm.ImportMidiAsync(path);
+    }
+
     private async void OnAddFiles(object? sender, RoutedEventArgs e)
     {
         if (Vm is null) return;
@@ -574,7 +619,10 @@ public partial class MainWindow : Window
             ],
         });
         var paths = files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
-        if (paths.Count > 0) await Vm.LoadFilesAsync(paths, replace: false);
+        var midi = paths.Where(MainViewModel.IsMidiFile).ToList();
+        var audio = paths.Except(midi).ToList();
+        if (audio.Count > 0) await Vm.LoadFilesAsync(audio, replace: false);
+        foreach (var m in midi) await Vm.ImportMidiAsync(m);
     }
 
     private void OnLoadDemo(object? sender, RoutedEventArgs e) => Vm?.LoadDemoCommand.Execute(null);
@@ -600,7 +648,10 @@ public partial class MainWindow : Window
             .Where(p => System.IO.File.Exists(p))
             .ToList();
         e.Handled = true;
-        if (paths.Count > 0) await Vm.LoadFilesAsync(paths, replace: false);
+        var midi = paths.Where(MainViewModel.IsMidiFile).ToList();
+        var audio = paths.Except(midi).ToList();
+        if (audio.Count > 0) await Vm.LoadFilesAsync(audio, replace: false);
+        foreach (var m in midi) await Vm.ImportMidiAsync(m);
     }
 
     // ---------- xuất file ----------

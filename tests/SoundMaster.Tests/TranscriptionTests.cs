@@ -83,6 +83,76 @@ public class TranscriptionTests
     }
 
     [Fact]
+    public void Clear_notes_are_main_and_short_quiet_blips_are_doubtful()
+    {
+        var x = Melody(2.0, (60, 0.2, 0.6), (67, 1.0, 0.09));
+        for (int i = (int)(1.0 * Fs); i < (int)(1.09 * Fs); i++) x[i] *= 0.08f; // nốt phụ rất nhỏ
+
+        var notes = NoteTranscriber.Transcribe(x, Fs);
+        var main = notes.First(n => n.MidiNote == 60);
+        Assert.False(main.IsDoubtful, $"nốt chính bị coi là nghi ngờ (độ tin cậy {main.Confidence})");
+        Assert.All(notes.Where(n => n.MidiNote != 60), n => Assert.True(n.IsDoubtful, $"{n.Name} {n.Confidence}"));
+    }
+
+    [Fact]
+    public void Note_preview_sounds_while_held_and_decays_after_release_even_when_stopped()
+    {
+        var engine = new SoundMaster.Core.Audio.MixerEngine();
+        engine.Preview.NoteOn(69);
+        var buffer = new float[4096];
+        engine.Read(buffer);
+        Assert.Contains(buffer, v => Math.Abs(v) > 0.05f);
+
+        engine.Preview.NoteOff();
+        for (int i = 0; i < 20; i++) engine.Read(buffer); // ~0,9 s > thời gian tắt dần
+        Assert.All(buffer, v => Assert.Equal(0f, v));
+        Assert.False(engine.Preview.IsActive);
+    }
+
+    [Fact]
+    public void Sequencer_renders_notes_at_the_right_time_only()
+    {
+        var seq = new SoundMaster.Core.Audio.NoteSequencer();
+        seq.Set([new List<TranscribedNote> { new(1.0, 1.5, 69, 100) }]);
+
+        float[] Render(double seconds)
+        {
+            var mix = new float[2 * 512];
+            seq.MixInto(mix, 512, (long)(seconds * Fs));
+            return mix;
+        }
+
+        Assert.All(Render(0.5), v => Assert.Equal(0f, v));     // trước nốt
+        Assert.Contains(Render(1.2), v => Math.Abs(v) > 0.02f); // trong nốt
+        Assert.All(Render(2.0), v => Assert.Equal(0f, v));     // sau khi tắt hẳn
+        Assert.Contains(Render(1.2), v => Math.Abs(v) > 0.02f); // tua lại vẫn đúng (không giữ trạng thái)
+    }
+
+    [Fact]
+    public void Midi_import_reads_notes_tempo_and_skips_drums()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"sm_{Guid.NewGuid():N}.mid");
+        try
+        {
+            var notes = new List<TranscribedNote> { new(0.0, 0.5, 60, 100), new(0.5, 1.0, 64, 90) };
+            MidiExporter.Export(path, notes, bpm: 100, trackName: "Piano");
+
+            var import = MidiImporter.Import(path);
+            Assert.Equal(100, import.Bpm, 1);
+            var lane = Assert.Single(import.Lanes);
+            Assert.Equal("Piano", lane.Name);
+            Assert.Equal([60, 64], lane.Notes.Select(n => n.MidiNote).ToArray());
+            Assert.Equal(0.5, lane.Notes[1].StartSeconds, 2);
+            Assert.Equal(1.0, lane.Notes[1].EndSeconds, 2);
+            Assert.Equal(90, lane.Notes[1].Velocity);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Midi_export_writes_notes_with_tempo_and_timing()
     {
         var notes = new List<TranscribedNote>
