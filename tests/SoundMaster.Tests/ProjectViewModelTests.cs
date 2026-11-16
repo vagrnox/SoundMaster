@@ -418,6 +418,54 @@ public class ProjectViewModelTests
         vm.Dispose();
     }
 
+    [AvaloniaFact]
+    public async Task Transcribe_demo_bass_and_lead_then_export_midi()
+    {
+        string dir = TempDir();
+        try
+        {
+            var vm = NewVm();
+            vm.LoadDemoCommand.Execute(null);
+            var bass = vm.Tracks.First(t => t.Name == "Bass");
+            var lead = vm.Tracks.First(t => t.Name == "Lead");
+
+            Assert.False(bass.HasNotes);
+            await vm.TranscribeTrackAsync(bass);
+            await vm.TranscribeTrackAsync(lead);
+            Assert.False(bass.IsTranscribing);
+
+            Assert.True(bass.HasNotes, vm.Status);
+            Assert.True(lead.HasNotes, vm.Status);
+            // Stem demo là các nốt có cao độ rõ: các nốt bóc ra phải nằm trong dải hợp lý và có độ dài sensible.
+            Assert.All(bass.Notes.Concat(lead.Notes), n =>
+            {
+                Assert.InRange(n.MidiNote, 28, 96);
+                Assert.True(n.Duration >= 0.05);
+                Assert.True(n.EndSeconds <= 16.5);
+            });
+            Assert.Contains("Bóc được", vm.Status);
+
+            string path = Path.Combine(dir, "bass.mid");
+            vm.ExportMidi(bass, path);
+            Assert.True(File.Exists(path));
+            var midi = new NAudio.Midi.MidiFile(path, strictChecking: false);
+            var ons = Enumerable.Range(0, midi.Tracks).SelectMany(t => midi.Events[t])
+                .OfType<NAudio.Midi.NoteOnEvent>().Where(e => e.Velocity > 0).ToList();
+            Assert.Equal(bass.Notes.Count, ons.Count);
+            Assert.Contains("Đã xuất", vm.Status);
+
+            // Kick (bộ gõ) không được biến thành đống nốt rác.
+            var kick = vm.Tracks.First(t => t.Name == "Kick");
+            await vm.TranscribeTrackAsync(kick);
+            Assert.True(kick.Notes.Count < 40, $"kick cho {kick.Notes.Count} nốt");
+            vm.Dispose();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(100.1, 100)]
     [InlineData(99.8, 100)]

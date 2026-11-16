@@ -60,6 +60,7 @@ public class WaveformView : Control
     private static readonly IPen IdlePen = new ImmutablePen(new ImmutableSolidColorBrush(PrimaryColor, 0.5), 1);
     private static readonly IBrush Transparent = Brushes.Transparent;
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
+    private static readonly IBrush NoteBrush = new ImmutableSolidColorBrush(Color.Parse("#FFFFFF"), 0.92);
 
     private enum DragMode { None, Creating, ResizeLeft, ResizeRight }
 
@@ -122,7 +123,7 @@ public class WaveformView : Control
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(TrackViewModel.ActiveRegion) or nameof(TrackViewModel.IsSelected)
-            or nameof(TrackViewModel.IsLocked))
+            or nameof(TrackViewModel.IsLocked) or nameof(TrackViewModel.Notes) or nameof(TrackViewModel.ShowNotes))
             InvalidateVisual();
     }
 
@@ -164,10 +165,39 @@ public class WaveformView : Control
             DrawBars(context, track, pps, x0, x1, h, keep);
         }
 
+        DrawNotes(context, w, h);
         if (regions is null) return;
         foreach (var r in regions)
         {
             if (TryClip(r, w, out _, out _)) DrawRegionFrame(context, r, ReferenceEquals(r, active), w, h);
+        }
+    }
+
+    /// <summary>
+    /// Các nốt đã bóc: thanh ngang trắng, cao độ càng cao càng ở trên (thang tự co theo khoảng nốt của track),
+    /// vẽ chồng lên waveform.
+    /// </summary>
+    private void DrawNotes(DrawingContext context, double w, double h)
+    {
+        var notes = _vm?.Notes;
+        if (notes is null || notes.Count == 0 || _vm?.ShowNotes != true) return;
+
+        int lo = int.MaxValue, hi = int.MinValue;
+        foreach (var n in notes)
+        {
+            lo = Math.Min(lo, n.MidiNote);
+            hi = Math.Max(hi, n.MidiNote);
+        }
+        int span = Math.Max(1, hi - lo);
+        const double top = 8, bottom = 8, thickness = 5;
+
+        foreach (var n in notes)
+        {
+            double x0 = XAt(n.StartSeconds), x1 = XAt(n.EndSeconds);
+            if (x1 < 0 || x0 > w) continue;
+            double fraction = (n.MidiNote - lo) / (double)span;
+            double y = h - bottom - thickness - fraction * (h - top - bottom - thickness);
+            context.DrawRectangle(NoteBrush, null, new Rect(x0, y, Math.Max(2, x1 - x0), thickness), 2, 2);
         }
     }
 

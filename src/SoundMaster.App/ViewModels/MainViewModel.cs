@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SoundMaster.Core.Analysis;
 using SoundMaster.Core.Audio;
+using SoundMaster.Core.Transcription;
 
 namespace SoundMaster.App.ViewModels;
 
@@ -379,6 +380,47 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 _stretch.Reset();
                 Timeline.PositionSeconds = MixerEngine.FramesToSeconds(start);
             }
+        }
+    }
+
+    // ---------- bóc nốt từ stem ----------
+
+    /// <summary>Bóc nốt đơn âm từ stem (giọng, bass, lead...) rồi hiện chồng lên waveform.</summary>
+    public async Task TranscribeTrackAsync(TrackViewModel track)
+    {
+        if (track.IsTranscribing) return;
+        track.IsTranscribing = true;
+        Status = $"Đang bóc nốt \"{track.Name}\"…";
+        try
+        {
+            var notes = await Task.Run(() => NoteTranscriber.Transcribe(track.Audio));
+            track.Notes = notes;
+            track.ShowNotes = true;
+            Status = notes.Count == 0
+                ? $"Không tìm thấy nốt đơn âm rõ trong \"{track.Name}\" (nhạc cụ đa âm hoặc bộ gõ?)."
+                : $"Bóc được {notes.Count} nốt từ \"{track.Name}\" ({TranscribedNote.NameOf(notes.Min(n => n.MidiNote))}–{TranscribedNote.NameOf(notes.Max(n => n.MidiNote))}).";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Không bóc được nốt: {ex.Message}";
+        }
+        finally
+        {
+            track.IsTranscribing = false;
+        }
+    }
+
+    /// <summary>Xuất các nốt đã bóc của track ra file MIDI theo BPM hiện tại.</summary>
+    public void ExportMidi(TrackViewModel track, string path)
+    {
+        try
+        {
+            MidiExporter.Export(path, track.Notes, Timeline.Bpm, track.Name);
+            Status = $"Đã xuất {track.Notes.Count} nốt ra {Path.GetFileName(path)} ({Timeline.BpmText} BPM).";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Không xuất được MIDI: {ex.Message}";
         }
     }
 

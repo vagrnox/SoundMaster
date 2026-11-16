@@ -84,6 +84,7 @@ public class UiSmokeTests
         vm.Tracks[0].SetEffect(fadeRegion, RegionEffect.FadeIn);
         var loopRegion = vm.Tracks[3].BeginRegion(8.0, 12.0);
         vm.Tracks[3].SetEffect(loopRegion, RegionEffect.Loop);
+        vm.Tracks[4].Notes = SoundMaster.Core.Transcription.NoteTranscriber.Transcribe(vm.Tracks[4].Audio); // bóc nốt mẫu cho ảnh chụp
         vm.Tracks[2].RequestSelect();
         vm.Tracks[2].BeginRegion(3.0, 9.0);
         vm.MasterMeterLeftDb = -5;

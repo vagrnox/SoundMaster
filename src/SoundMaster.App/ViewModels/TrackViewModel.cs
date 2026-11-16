@@ -6,6 +6,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SoundMaster.Core.Audio;
+using SoundMaster.Core.Transcription;
 
 namespace SoundMaster.App.ViewModels;
 
@@ -122,6 +123,22 @@ public partial class TrackViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LaneBackground), nameof(HeaderBackground))]
     public partial bool IsSelected { get; set; }
+
+    // ---------- bóc nốt (MIDI) ----------
+
+    /// <summary>Các nốt đã bóc từ stem này (rỗng nếu chưa bóc). Dữ liệu suy ra từ audio nên không lưu vào project.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotes))]
+    public partial IReadOnlyList<TranscribedNote> Notes { get; set; } = [];
+
+    public bool HasNotes => Notes.Count > 0;
+
+    /// <summary>Vẽ các nốt đã bóc chồng lên waveform.</summary>
+    [ObservableProperty]
+    public partial bool ShowNotes { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool IsTranscribing { get; set; }
 
     // ---------- vùng chọn & hiệu ứng ----------
 
